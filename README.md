@@ -179,6 +179,61 @@ To score your own PDFs, put them in `eval/private/` (ignored by git) with a `<na
 - `<name>.apkg`: the Anki deck. Add `--csv` or `--json` to also get a text-import file or a full extraction log.
 - `outputs/`: evaluation reports (`eval.md`, `eval-<backend>.md`, which list every card and verdict) and the generated test PDFs and decks. This folder is ignored by git and rebuilt on each run.
 
+#### The `--json` file
+
+Three lists: `blocks` (the text extracted from the file, after headers, footers and page numbers are removed), `cards` (the cards in the deck) and `removed` (the cards that were dropped, each with a `reason`).
+
+```json
+{
+  "blocks": [
+    {
+      "kind": "bullet",
+      "text": "Osmosis: movement of water",
+      "source": "cells.pdf",
+      "heading_path": ["Cell Biology", "Transport"],
+      "page": 4,
+      "bold_lead": ""
+    }
+  ],
+  "cards": [
+    {
+      "front": "Osmosis",
+      "back": "movement of water",
+      "rule": "term_colon",
+      "source": "cells.pdf",
+      "heading_path": ["Cell Biology", "Transport"],
+      "page": 4,
+      "kind": "basic",
+      "source_label": "cells.pdf · p.4 · Cell Biology › Transport"
+    }
+  ],
+  "removed": [
+    {
+      "front": "Osmosis",
+      "back": "the movement of water across a membrane",
+      "rule": "bold_lead",
+      "source": "cells.pdf",
+      "heading_path": ["Cell Biology", "Transport"],
+      "page": 5,
+      "kind": "basic",
+      "source_label": "cells.pdf · p.5 · Cell Biology › Transport",
+      "reason": "same front as an earlier card"
+    }
+  ]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `kind` (block) | `heading`, `bullet` or `paragraph` |
+| `heading_path` | The headings above the text, outermost first |
+| `page` | 1-based page number; `null` for Markdown |
+| `bold_lead` | Bold text that starts the block, usually a term being defined; empty if none |
+| `kind` (card) | `basic` (front and back) or `cloze`: the whole sentence is in `front` with `{{c1::…}}` around the hidden words, and `back` is empty |
+| `rule` | The rule that made the card (see [Rules](#rules)), or `ai_<backend>` for AI cards |
+| `source_label` | The source line shown under the answer in Anki |
+| `reason` | `same front as an earlier card`, `near-duplicate of an earlier card`, `too long` or `empty side` |
+
 ## Reading your cards in Anki
 
 **The source line.** Under each answer, a small grey line shows where the card came from: the file, the page for PDFs, and the headings the line sat under. You can use it to check a card against your notes.
