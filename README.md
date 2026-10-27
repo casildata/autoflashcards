@@ -6,7 +6,7 @@
 
 Turn PDFs, slides and notes into Anki-ready flashcard decks.
 
-**Status:** early development. PDF and Markdown input work today; PowerPoint is next.
+**Status:** early development. PDF and Markdown input work today.
 
 ## Usage
 
@@ -49,6 +49,27 @@ Skipped everywhere: figure and table captions, labels such as `Note:` or `Keywor
 For PDFs, headings are found by font size and bold text, running headers, footers and page numbers are removed, and two-column pages are read left column first. Handouts with several slides per page are read slide by slide, and each page's own body text size is used to tell headings from bullets, since every slide on a handout can be scaled differently. Bullets whose markers are pictures (common in exported slides) count as bullets when they are short and have no closing period.
 
 **Not yet supported:** scanned PDFs (pages that are images, with no text layer) produce no cards; OCR is planned. In PDFs, sub-bullets aren't told apart from bullets, so a bold term's back is "the bullets after it, up to the next bold term or slide".
+
+## How well it works
+
+`eval/score.py` builds four test documents with original text, in layouts taken from real course material, and checks the cards against hand-written gold cards: what a student should get a card for. The gold cards were written before running the tool, so they include facts no rule catches yet.
+
+| Document | Layout | Gold | Cards | Precision | Recall |
+|---|---|---:|---:|---:|---:|
+| handout | 4 slides per page, bullets drawn as pictures, a notes column, a chart slide | 10 | 7 | 100% | 70% |
+| deck | one slide per page: divider, bold sub-terms, arrows, picture and "Questions?" slides | 6 | 5 | 100% | 83% |
+| article | two columns with a narrow gutter, abstract, keywords, figure caption, references | 6 | 5 | 100% | 83% |
+| textbook | single column, running header, page numbers, bold terms | 9 | 5 | 100% | 56% |
+| **All** | | 31 | 22 | **100%** | **71%** |
+
+*Precision* is the share of cards that match a gold card; *recall* is the share of gold cards found. Missed today: definitions phrased as plain statements ("Producers capture energy from sunlight"), "X means Y", definitions set off by commas ("Retention, the share of customers who…"), and two terms defined in one sentence. Real PDFs are messier than these documents, so expect lower precision on your own files.
+
+```
+python eval/score.py              # writes outputs/eval.md and a deck per document
+python eval/score.py --private    # scores eval/private/<name>.pdf against <name>.jsonl
+```
+
+To score your own PDFs, put them in `eval/private/` (ignored by git) with a `<name>.jsonl` beside each, one `{"term": "...", "fact": "..."}` per line. CI runs the scorer on every push and shows the table in the run summary.
 
 ## Reading your cards in Anki
 

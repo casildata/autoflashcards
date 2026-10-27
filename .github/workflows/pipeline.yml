@@ -50,6 +50,30 @@ jobs:
       - name: Unit tests
         run: python -m pytest -q
 
+  e2e:
+    # generated documents -> decks -> scores against the gold cards; fails on a crash or no cards
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install package
+        run: pip install -e ".[dev]"
+
+      - name: Evaluate rules
+        run: |
+          python eval/score.py
+          cat outputs/eval.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: eval
+          path: outputs/
+
   secret-scan:
     runs-on: ubuntu-24.04
     steps:

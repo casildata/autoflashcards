@@ -1,0 +1,6 @@
+{"term": "Customer lifetime value", "fact": "the total revenue a shop expects from one customer over the whole relationship"}
+{"term": "Churn", "fact": "customers who stop buying from a shop"}
+{"term": "Retention", "fact": "the share of customers who come back within a year"}
+{"term": "Recency", "fact": "the number of days since the last purchase"}
+{"term": "Frequency", "fact": "the number of purchases in the study period"}
+{"term": "Monetary value", "fact": "the total amount the customer spent"}

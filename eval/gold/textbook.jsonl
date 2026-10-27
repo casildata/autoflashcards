@@ -1,0 +1,9 @@
+{"term": "Gene", "fact": "a stretch of DNA that carries the instructions for one protein"}
+{"term": "Allele", "fact": "a version of a gene"}
+{"term": "Genotype", "fact": "the set of alleles an organism carries"}
+{"term": "Phenotype", "fact": "the traits that can be observed"}
+{"term": "Dominant allele", "fact": "hides the effect of recessive ones"}
+{"term": "Recessive allele", "fact": "shows only when both copies of the gene are recessive"}
+{"term": "Punnett square", "fact": "a grid used to predict the genotypes of offspring from two parents"}
+{"term": "Homozygous", "fact": "having two identical alleles of a gene"}
+{"term": "Heterozygous", "fact": "having two different alleles of a gene"}

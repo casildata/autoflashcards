@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Evaluation: `eval/score.py` scores the rules against hand-written gold cards for four generated documents (handout, slide deck, two-column article, textbook) and writes `outputs/eval.md`; `--private` scores your own PDFs in the git-ignored `eval/private/`. Baseline: 100% precision, 71% recall over 31 gold cards. CI's new `e2e` job runs it on every push.
+
 - PDF slide handouts (several slides per page): page layout is split into text boxes by recursive XY-cut, so slides are read one at a time and two-column articles with narrow gutters are read column by column. Lines that stop short of their box's edge end an item even without a period, and a `Term = …` line always starts a new one.
 - Headings are judged against each page's body text size (pages with little text use the document's), and large prose that carries on into a lowercase line isn't a heading.
 - `slide_title_bullets` stays on the title's page, and accepts short paragraphs without a closing period as bullets (slides whose bullet markers are pictures).

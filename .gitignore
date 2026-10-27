@@ -1,6 +1,9 @@
-# Generated outputs (re-created by run_all.py)
+# Generated outputs (re-created by eval/score.py)
 outputs/*
 !outputs/.gitkeep
+
+# Your own documents and gold cards for eval/score.py --private
+eval/private/
 
 # AI response cache
 .cache/

@@ -34,6 +34,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["eval"]  # tests import the eval scorer
 # genanki's cached-property dependency uses an asyncio API deprecated in Python 3.14
 filterwarnings = ["ignore::DeprecationWarning:cached_property"]
 
