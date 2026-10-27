@@ -1,5 +1,10 @@
 import pytest
-from make_fixtures import build_cells_pdf, build_slides_pdf, build_two_column_pdf
+from make_fixtures import (
+    build_cells_pdf,
+    build_handout_pdf,
+    build_slides_pdf,
+    build_two_column_pdf,
+)
 
 
 @pytest.fixture(scope="session")
@@ -15,3 +20,8 @@ def slides_pdf(tmp_path_factory):
 @pytest.fixture(scope="session")
 def two_column_pdf(tmp_path_factory):
     return build_two_column_pdf(tmp_path_factory.mktemp("fixtures") / "two_column.pdf")
+
+
+@pytest.fixture(scope="session")
+def handout_pdf(tmp_path_factory):
+    return build_handout_pdf(tmp_path_factory.mktemp("fixtures") / "handout.pdf")

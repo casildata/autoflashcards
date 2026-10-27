@@ -183,8 +183,35 @@ def build_slides_pdf(path: Path) -> Path:
     return path
 
 
+# A handout page: four slides in a 2x2 grid, so lines of the left and right slides sit at
+# the same heights. Bullet text starts well after its marker, as in exported slides
+HANDOUT = [
+    ("Mitosis", ["Divides one nucleus into two", "Keeps the chromosome number"]),
+    ("Meiosis", ["Makes four sex cells", "Halves the chromosome number"]),
+    ("Cytokinesis", ["Splits the cytoplasm", "Follows mitosis"]),
+    ("Interphase", ["The cell grows", "DNA is copied"]),
+]
+
+
+def build_handout_pdf(path: Path) -> Path:
+    canvas = Canvas(str(path), pagesize=letter)
+    for i, (title, bullets) in enumerate(HANDOUT):
+        x = LEFT + (i % 2) * 250
+        y = TOP - (i // 2) * 300
+        canvas.setFont(BOLD, 14)
+        canvas.drawString(x, y, title)
+        canvas.setFont(REGULAR, 9)
+        for n, text in enumerate(bullets):
+            canvas.drawString(x, y - 24 - n * 14, "•")
+            canvas.drawString(x + 16, y - 24 - n * 14, text)
+    canvas.showPage()
+    canvas.save()
+    return path
+
+
 if __name__ == "__main__":
     out = Path(__file__).parent / "fixtures"
     print(build_cells_pdf(out / "cells.pdf"))
     print(build_two_column_pdf(out / "two_column.pdf"))
     print(build_slides_pdf(out / "slides.pdf"))
+    print(build_handout_pdf(out / "handout.pdf"))

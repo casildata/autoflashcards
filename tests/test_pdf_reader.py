@@ -52,6 +52,17 @@ def test_two_columns_are_read_left_column_first(two_column_pdf):
     ]
 
 
+def test_handout_slides_are_read_one_by_one(handout_pdf):
+    # left and right slides share line heights; each slide is read whole, top row first
+    cards, _ = dedupe(generate(read(handout_pdf)))
+    assert [(c.front, c.back.split("\n")) for c in cards] == [
+        ("Mitosis", ["Divides one nucleus into two", "Keeps the chromosome number"]),
+        ("Meiosis", ["Makes four sex cells", "Halves the chromosome number"]),
+        ("Cytokinesis", ["Splits the cytoplasm", "Follows mitosis"]),
+        ("Interphase", ["The cell grows", "DNA is copied"]),
+    ]
+
+
 def test_slide_deck_cards(slides_pdf):
     cards, _ = dedupe(generate(read(slides_pdf)))
     assert [(c.rule, c.front, c.back.split("\n")) for c in cards] == [

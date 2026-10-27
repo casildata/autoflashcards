@@ -16,6 +16,8 @@ class Line:
     top: float  # distance from the top of the page
     bottom: float
     bold_lead: str = ""  # bold text at the start of the line, after any bullet marker
+    x1: float | None = None  # where the line ends
+    box_right: float | None = None  # right edge of the text box the line sits in
 
 
 @dataclass(frozen=True)

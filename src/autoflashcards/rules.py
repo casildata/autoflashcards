@@ -19,7 +19,7 @@ _MAX_TERM_WORDS = 6
 # Labels that look like "Term:" but introduce a remark, not a definition
 _NOT_TERMS = {
     "note", "notes", "example", "examples", "e.g.", "tip", "warning", "see", "source",
-    "keywords", "key words", "abstract",
+    "keywords", "key words", "abstract", "e-mail", "email", "tel", "phone", "fax", "doi",
 }  # fmt: skip
 _CAPTION = re.compile(r"^(fig(ure)?|table|chart|exhibit|eq(uation)?)\.?\s*\d", re.IGNORECASE)
 # Sections with no facts to learn: citations, slide-deck front and back matter
@@ -33,6 +33,7 @@ _PICTURE_TITLE = re.compile(
 )
 MAX_SECTION_BULLETS = 8  # a slide's worth; longer bullet lists are textbook lists, not slides
 MAX_BACK_BULLETS = 3
+MAX_BULLET_WORDS = 20
 
 # "X is a / are the / was an / is defined as / is called / refers to Y". Not "means": too
 # often a plain verb or a name ("proc means")
@@ -61,6 +62,7 @@ def _is_term(term: str) -> bool:
     return (
         any(ch.isalpha() for ch in term)  # not a bare number such as a bold page number
         and not re.fullmatch(r"\d+s", term)  # nor a decade ("1970s")
+        and term.count("(") == term.count(")")  # not cut mid-formula ("18.3 (= 406/22)")
         and len(term.split()) <= _MAX_TERM_WORDS
         and term.lower() not in _NOT_TERMS
         and not _CAPTION.match(term)
@@ -139,6 +141,19 @@ def bold_term_bullets(blocks: list[Block], i: int) -> list[Card]:
     return [_card(term, term.text, "\n".join(explained[:MAX_BACK_BULLETS]), "bold_term_bullets")]
 
 
+def _is_bullet(block: Block) -> bool:
+    """A bullet, or a line that reads like one: slides whose bullet markers are pictures
+    give paragraphs, but short ones without a closing period."""
+    if block.kind == "bullet":
+        return True
+    return (
+        block.kind == "paragraph"
+        and any(ch.isalpha() for ch in block.text)
+        and len(block.text.split()) <= MAX_BULLET_WORDS
+        and not re.search(r"[.!?:]$", block.text)
+    )
+
+
 def slide_title_bullets(blocks: list[Block], i: int) -> list[Card]:
     """A slide whose title is a term and whose bullets explain it:
 
@@ -158,13 +173,13 @@ def slide_title_bullets(blocks: list[Block], i: int) -> list[Card]:
         return []
     section = []
     for block in blocks[i + 1 :]:
-        if block.kind == "heading":
-            break
+        if block.kind == "heading" or block.page != title.page:
+            break  # a slide's bullets are on its own page
         section.append(block)
     if (
         not section
         or len(section) > MAX_SECTION_BULLETS
-        or any(b.kind != "bullet" for b in section)
+        or not all(_is_bullet(b) for b in section)
         or _all_bold(section[0])  # sub-terms under the title: bold_term_bullets' job
         # labeled items ("Osmosis: …") are cards already; the title is just their category
         or any(term_colon(b) for b in section)

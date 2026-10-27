@@ -42,11 +42,11 @@ Each paragraph or bullet is checked against these rules in order; the first one 
 
 `definition_sentence` looks for "X is a / are the / was an / is defined as / is called / is known as / refers to …", and skips sentences whose subject is a pronoun ("It is a…", "There are…").
 
-The last two rules are for lecture slides, including slides exported to PDF. A card's back holds up to three bullets, one per line. `slide_title_bullets` only uses short sections made entirely of bullets (up to 8), so the headings of a textbook or article don't turn into list cards. It also skips titles that describe a picture ("Image of…", "Example of…", "Illustration of…") and slides whose bullets are already `Term: definition` cards.
+The last two rules are for lecture slides, including slides exported to PDF. A card's back holds up to three bullets, one per line. `slide_title_bullets` only uses short sections made entirely of bullets (up to 8) on the slide's own page, so the headings of a textbook or article don't turn into list cards. It also skips titles that describe a picture ("Image of…", "Example of…", "Illustration of…") and slides whose bullets are already `Term: definition` cards.
 
 Skipped everywhere: figure and table captions, labels such as `Note:` or `Keywords:`, and sections headed References, Bibliography, Table of contents, Thanks or Credits. Cards with the same front, near-identical cards (90% similar or more) and overly long cards are dropped; `--json` lists them.
 
-For PDFs, headings are found by font size and bold text, running headers, footers and page numbers are removed, and two-column pages are read left column first.
+For PDFs, headings are found by font size and bold text, running headers, footers and page numbers are removed, and two-column pages are read left column first. Handouts with several slides per page are read slide by slide, and each page's own body text size is used to tell headings from bullets, since every slide on a handout can be scaled differently. Bullets whose markers are pictures (common in exported slides) count as bullets when they are short and have no closing period.
 
 **Not yet supported:** scanned PDFs (pages that are images, with no text layer) produce no cards; OCR is planned. In PDFs, sub-bullets aren't told apart from bullets, so a bold term's back is "the bullets after it, up to the next bold term or slide".
 

@@ -6,8 +6,8 @@ from autoflashcards.structure import to_blocks
 BODY = 10.0
 
 
-def line(text, top, page=1, size=BODY, bold=False, x0=72):
-    return Line(text, page, size, bold, x0, top, top + size)
+def line(text, top, page=1, size=BODY, bold=False, x0=72, x1=None, box_right=None):
+    return Line(text, page, size, bold, x0, top, top + size, "", x1, box_right)
 
 
 def blocks(lines):
@@ -165,6 +165,50 @@ def test_sentence_continues_across_a_page_break():
         (1, "The cycle has eight steps in total."),  # a block's page is where it starts
         (2, "New paragraph."),
     ]
+
+
+def test_short_line_then_capital_starts_a_new_item():
+    # slide bullets drawn as pictures: no marker, no period, but the first line stops short
+    result = blocks([
+        line("The subject is large", 100, x0=72, x1=180, box_right=400),
+        line("Life is studied on many levels, from cells and the molecules in", 115, x1=400,
+             box_right=400),
+        line("them to the planet", 130, x1=170, box_right=400),
+    ])  # fmt: skip
+    assert [text for _, _, text in result] == [
+        "The subject is large",
+        "Life is studied on many levels, from cells and the molecules in them to the planet",
+    ]
+
+
+def test_definition_line_starts_a_new_item():
+    result = blocks([
+        line("Smallest unit of organization that can perform all of the activities", 100,
+             x1=400, box_right=400),
+        line("Cell theory = all organisms are made of cells", 115, x1=300, box_right=400),
+    ])  # fmt: skip
+    assert len(result) == 2
+
+
+def test_body_size_is_found_per_page():
+    # a handout page whose slides print bullets at 12pt, in a file whose body text is 9pt
+    bullet = "Short slide bullet with no period"
+    result = blocks(
+        [line(bullet, 100 + 30 * i, page=1, size=12) for i in range(6)]
+        + [line("Title", 80, page=2, size=16)]
+        + [line(bullet, 100 + 30 * i, page=2, size=9) for i in range(9)]
+    )
+    assert [text for kind, _, text in result if kind == "heading"] == ["Title"]
+
+
+def test_large_prose_that_goes_on_is_not_a_heading():
+    result = blocks([
+        line("Several properties are found", 100, size=14),
+        line("in all living things", 118, size=14),
+        line("A body sentence that sets the body size for the rest of this page, and more.", 150),
+        line("A body sentence that sets the body size for the rest of this page, and more.", 165),
+    ])  # fmt: skip
+    assert result[0][0] == "paragraph"
 
 
 def test_empty_input():

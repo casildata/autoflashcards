@@ -56,6 +56,8 @@ def test_card_keeps_source_and_rule():
         "198: page number as the term",
         "1970s: research suggests bacteria signal to one another",  # a decade
         "Example → steroid hormones",
+        "E-mail: someone@example.org",
+        "2011 was 18.3 (= 406/22)",  # cut mid-formula: unbalanced parentheses
     ],
 )
 def test_not_a_definition(text):
@@ -241,6 +243,8 @@ def test_slide_title_with_bullets():
         [heading("Receptors"), bullet("GPCR", bold=True), bullet("Uses a G protein")],
         [heading("Transport"), bullet("Osmosis: movement of water"), bullet("Uses no ATP")],
         [heading("A title that is far too long to be a term")],
+        [heading("Receptors"), bullet("On the next slide", page=2)],
+        [heading("Domains"), Block("paragraph", "13%", "x.pdf", (), 1)],  # a chart label
     ],
 )
 def test_not_a_slide_title_card(blocks):
@@ -254,6 +258,15 @@ def test_slide_with_an_example_bullet_still_counts():
         bullet("Example → steroid hormones"),
     ]
     assert _slide(blocks)[0] == "Intracellular Receptors"
+
+
+def test_bullets_drawn_as_pictures_still_count():
+    # a slide whose bullet markers are images: its bullets come through as short paragraphs
+    blocks = [
+        heading("Qualitative"),
+        Block("paragraph", "Recorded observations and descriptions", "x.pdf", (), 1),
+    ]
+    assert _slide(blocks)[:2] == ("Qualitative", ["Recorded observations and descriptions"])
 
 
 # generate

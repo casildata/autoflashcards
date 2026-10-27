@@ -10,8 +10,9 @@ from autoflashcards.models import Block, Line
 from autoflashcards.structure import to_blocks
 
 _BOLD_MARKERS = ("bold", "black", "heavy", "semibold")
-COLUMN_GAP = 2.0  # a gap wider than this many font sizes inside a line is a column gutter
-MIN_SPLIT_SHARE = 0.25  # share of a page's lines that must split for it to count as two columns
+COLUMN_GAP = 1.2  # a blank band this many font sizes wide separates columns or boxes
+MARKER_CHARS = 2
+ROW_GAP = 1.5  # a blank band this many font sizes tall separates stacked regions
 # A gap wider than this share of the font size is a word space. pdfplumber's default (a fixed
 # 3pt) runs words together in small fonts and splits words in some typeset PDFs
 WORD_GAP_RATIO = 0.15
@@ -38,43 +39,65 @@ def _unique(chars: list[dict]) -> list[dict]:
 def _segments(chars: list[dict]) -> list[list[dict]]:
     """Split one line's characters wherever the gap is wide enough to be a column gutter.
 
-    Gaps are measured between visible characters only.
+    Gaps are measured between visible characters only. The gap after a bullet marker ("•",
+    "1.") can be as wide as a gutter, so a piece of one or two letters is never split off.
     """
     segments: list[list[dict]] = [[]]
     last = None  # previous visible character
     for char in sorted(chars, key=lambda c: c["x0"]):
         if char["text"].strip():
-            if last and char["x0"] - last["x1"] > COLUMN_GAP * last["size"]:
+            gutter = last and char["x0"] - last["x1"] > COLUMN_GAP * last["size"]
+            if gutter and len(_visible(segments[-1])) > MARKER_CHARS:
                 segments.append([])
             last = char
         segments[-1].append(char)
     return [s for s in segments if _visible(s)]
 
 
-def _in_reading_order(lines: list[list[dict]], page_width: float) -> list[list[dict]]:
-    """Character groups for one page, in reading order: two-column pages left column first.
+def _widest_gap(spans: list[tuple[float, float]]) -> tuple[float, float]:
+    """Widest blank stretch between (start, end) spans along one axis: (width, middle)."""
+    spans = sorted(spans)
+    best, middle = 0.0, 0.0
+    reach = spans[0][1]
+    for start, end in spans[1:]:
+        if start - reach > best:
+            best, middle = start - reach, (start + reach) / 2
+        reach = max(reach, end)
+    return best, middle
 
-    pdfplumber joins characters at the same height into one line, so on a two-column page
-    each line holds text from both columns. Split those lines at the gutter, then read the
-    left column top to bottom, then the right.
+
+def _in_reading_order(segments: list[list[dict]]) -> list[list[list[dict]]]:
+    """A page's line segments grouped into text boxes, boxes in reading order (recursive
+    XY-cut).
+
+    Cut the region at its widest blank band, vertical (left part first) or horizontal (top
+    part first), and repeat in each part until no band is wide enough; what's left is a box.
+    This reads two-column articles column by column, and handout pages with 2x2 slides slide
+    by slide, then each slide's boxes in turn.
     """
-    split = [_segments(chars) for chars in lines]
-    gutters = [
-        (_visible(s[0])[-1]["x1"] + _visible(s[1])[0]["x0"]) / 2 for s in split if len(s) > 1
-    ]
-    if not gutters or len(gutters) < MIN_SPLIT_SHARE * len(lines):
-        return lines
-    gutter = median(gutters)
-    near = [g for g in gutters if abs(g - gutter) < 0.05 * page_width]
-    if len(near) < 0.6 * len(gutters):  # gaps at scattered positions: a table, not columns
-        return lines
+    if len(segments) < 2:
+        return [segments] if segments else []
+    visible = [_visible(s) for s in segments]
+    size = median(c["size"] for v in visible for c in v)
+    x_gap, x_cut = _widest_gap(
+        [(min(c["x0"] for c in v), max(c["x1"] for c in v)) for v in visible]
+    )
+    y_gap, y_cut = _widest_gap(
+        [(min(c["top"] for c in v), max(c["bottom"] for c in v)) for v in visible]
+    )
 
-    left, right = [], []
-    for segments in split:
-        for segment in segments:
-            starts_right = min(c["x0"] for c in _visible(segment)) >= gutter
-            (right if starts_right else left).append(segment)
-    return sorted(left, key=_top) + sorted(right, key=_top)
+    if x_gap >= COLUMN_GAP * size and x_gap >= y_gap:
+        first = [
+            s for s, v in zip(segments, visible, strict=True) if min(c["x0"] for c in v) < x_cut
+        ]
+    elif y_gap >= ROW_GAP * size:
+        first = [
+            s for s, v in zip(segments, visible, strict=True) if min(c["top"] for c in v) < y_cut
+        ]
+    else:
+        return [sorted(segments, key=lambda s: (_top(s), min(c["x0"] for c in _visible(s))))]
+    rest = [s for s in segments if not any(s is f for f in first)]
+    return _in_reading_order(first) + _in_reading_order(rest)
 
 
 def _top(chars: list[dict]) -> float:
@@ -109,26 +132,33 @@ def read_lines(path: Path) -> list[Line]:
     try:
         with pdfplumber.open(path) as pdf:
             for page in pdf.pages:
-                # dedupe: some PDFs print a glyph twice in the same spot (fake bold, ligatures)
-                raw_lines = [
-                    _unique(r["chars"])
+                # dedupe: some PDFs print a glyph twice in the same spot (fake bold, ligatures).
+                # pdfplumber joins everything at one height into a line, so split lines at
+                # wide gaps first: pieces side by side belong to different columns or boxes
+                segments = [
+                    segment
                     for r in page.dedupe_chars().extract_text_lines(keep_blank_chars=True)
                     if _visible(r["chars"])
+                    for segment in _segments(_unique(r["chars"]))
                 ]
-                for chars in _in_reading_order(raw_lines, page.width):
-                    visible = _visible(chars)
-                    lines.append(
-                        Line(
-                            text=_text(chars),
-                            page=page.page_number,
-                            size=median(c["size"] for c in visible),
-                            bold=all(_is_bold(c["fontname"]) for c in visible),
-                            x0=min(c["x0"] for c in visible),
-                            top=_top(chars),
-                            bottom=max(c["bottom"] for c in visible),
-                            bold_lead=_bold_lead(chars),
+                for box in _in_reading_order(segments):
+                    box_right = max(c["x1"] for chars in box for c in _visible(chars))
+                    for chars in box:
+                        visible = _visible(chars)
+                        lines.append(
+                            Line(
+                                text=_text(chars),
+                                page=page.page_number,
+                                size=median(c["size"] for c in visible),
+                                bold=all(_is_bold(c["fontname"]) for c in visible),
+                                x0=min(c["x0"] for c in visible),
+                                top=_top(chars),
+                                bottom=max(c["bottom"] for c in visible),
+                                bold_lead=_bold_lead(chars),
+                                x1=max(c["x1"] for c in visible),
+                                box_right=box_right,
+                            )
                         )
-                    )
     except Exception as err:  # pdfminer raises many types for damaged or encrypted files
         raise ValueError(f"can't read {path.name}: {err}") from err
     return lines
