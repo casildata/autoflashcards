@@ -67,26 +67,30 @@ def test_ids_are_stable_across_runs_and_back_edits(tmp_path):
 def test_csv_for_anki_text_import(tmp_path):
     out = tmp_path / "deck.csv"
     write_csv(CARDS, "Bio", out)
-    lines = out.read_text(encoding="utf-8").splitlines()
-    assert lines[:6] == [
-        "#separator:tab",
+    # a BOM, so Excel and Notepad read "·" and "›" as UTF-8 instead of Windows-1252
+    assert out.read_bytes().startswith(b"\xef\xbb\xbf#separator:comma")
+    lines = out.read_text(encoding="utf-8-sig").splitlines()
+    assert lines[:7] == [
+        "#separator:comma",
         "#html:true",
-        "#guid column:1",
-        "#notetype column:2",
-        "#deck column:3",
-        "#tags column:6",
+        "#columns:Front,Back,Tags,Note type,Deck,ID",
+        "#tags column:3",
+        "#notetype column:4",
+        "#deck column:5",
+        "#guid column:6",
     ]
-    rows = list(csv.reader(lines[6:], delimiter="\t"))
+    rows = list(csv.reader(lines[7:]))
     assert rows[0] == [
-        note_guid("Bio", CARDS[0]),  # same ID as the .apkg note
-        "Basic",
-        "Bio",
         "Osmosis",
         "movement of water<br><small>cells.md · Cell Biology › Transport</small>",
         "afg::rule::term_colon cell_biology::transport",
+        "Basic",
+        "Bio",
+        note_guid("Bio", CARDS[0]),  # same ID as the .apkg note
     ]
-    assert rows[1][4].startswith("high to low &lt;conc&gt;")
-    assert rows[2][1:4] == ["Cloze", "Bio", "{{c1::Cells}} are the unit of life."]
+    assert rows[1][1].startswith("high to low &lt;conc&gt;")
+    assert rows[2][0] == "{{c1::Cells}} are the unit of life."
+    assert rows[2][3:5] == ["Cloze", "Bio"]
 
 
 def test_json_lists_blocks_cards_and_drops(tmp_path):

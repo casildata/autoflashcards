@@ -100,32 +100,36 @@ def write_apkg(cards: list[Card], deck_name: str, out: Path) -> None:
     genanki.Package(deck).write_to_file(str(out))
 
 
-# Anki 2.1.55+ reads these headers, so the import needs no manual column mapping
-_CSV_HEADER = """#separator:tab
+# Anki 2.1.55+ reads these headers, so the import needs no manual column mapping.
+# Commas, not tabs, because Excel splits a double-clicked .csv on commas; the readable
+# columns come first and the #columns line doubles as Excel's header row.
+_CSV_HEADER = """#separator:comma
 #html:true
-#guid column:1
-#notetype column:2
-#deck column:3
-#tags column:6
+#columns:Front,Back,Tags,Note type,Deck,ID
+#tags column:3
+#notetype column:4
+#deck column:5
+#guid column:6
 """
 
 
 def write_csv(cards: list[Card], deck_name: str, out: Path) -> None:
-    """Tab-separated file for Anki's built-in Basic and Cloze note types (which have no
-    Source field, so the source line goes at the end of the second field)."""
-    with out.open("w", encoding="utf-8", newline="") as f:
+    """CSV for Anki's built-in Basic and Cloze note types (which have no Source field, so
+    the source line goes at the end of the second field). Written with a BOM: without one,
+    Excel and Notepad read the UTF-8 as Windows-1252 ("·" shows as "Â·")."""
+    with out.open("w", encoding="utf-8-sig", newline="") as f:
         f.write(_CSV_HEADER)
-        writer = csv.writer(f, delimiter="\t", lineterminator="\n")
+        writer = csv.writer(f, lineterminator="\n")
         for card in cards:
             source = f"<br><small>{_html(card.source_label)}</small>"
             notetype = "Cloze" if card.kind == "cloze" else "Basic"
             writer.writerow([
-                note_guid(deck_name, card),
-                notetype,
-                deck_name,
                 _html(card.front),
                 _html(card.back) + source,
                 " ".join(tags(card)),
+                notetype,
+                deck_name,
+                note_guid(deck_name, card),
             ])  # fmt: skip
 
 

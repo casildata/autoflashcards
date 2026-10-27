@@ -135,7 +135,7 @@ Then in Anki: **File → Import**, and pick the `.apkg` file.
 |---|---|
 | `--out FILE` | Where to write the deck (default: the first input's name, `.apkg`) |
 | `--deck NAME` | Deck name in Anki (default: the first input's name) |
-| `--csv` | Also write a `.csv` for Anki's text import (Anki 2.1.55+, built-in Basic and Cloze note types) |
+| `--csv` | Also write a `.csv` that opens in Excel with one column per field, and imports into Anki 2.1.55+ with no column mapping. It uses Anki's built-in Basic and Cloze note types, which have no Source field, so the source line goes at the end of the Back field; use the `.apkg` to keep Source as its own field |
 | `--json` | Also write a `.json` with everything extracted, every card, and every dropped card with the reason. It is written even when no cards are found, which is when it helps most |
 | `--rules a,b` | Use only these rules (see [Rules](#rules)) |
 | `--ai claude` / `claude-code` / `ollama` | Also make cards with a language model (see [AI cards](#ai-cards-optional)) |
