@@ -145,3 +145,33 @@ def test_unknown_ai_backend(tmp_path):
     result = runner.invoke(app, [str(FIXTURE), "--out", str(tmp_path / "d.apkg"), "--ai", "gpt"])
     assert result.exit_code == 2
     assert "--ai must be one of: claude, claude-code, ollama" in result.output
+
+
+def test_preview_prints_cards_and_writes_no_deck(tmp_path):
+    out = tmp_path / "deck.apkg"
+    result = runner.invoke(app, [str(FIXTURE), "--out", str(out), "--preview"])
+    assert result.exit_code == 0, result.output
+    assert "2. Osmosis\n   movement of water across a semipermeable membrane.\n" in result.output
+    assert "(term_colon; cells.md · Cell Biology › Transport)" in result.output
+    assert not out.exists()
+
+
+def test_preview_file(tmp_path):
+    out, preview = tmp_path / "deck.apkg", tmp_path / "preview.txt"
+    result = runner.invoke(app, [str(FIXTURE), "--out", str(out), "--preview-file", str(preview)])
+    assert result.exit_code == 0, result.output
+    assert f"Wrote a preview of 10 cards to {preview}; no deck written" in result.output
+    assert preview.read_text(encoding="utf-8").startswith("1. {{c1::Cells}} are the basic unit")
+    assert not out.exists()
+
+
+def test_locked_output_file(monkeypatch, tmp_path):
+    def locked(cards, deck_name, out):
+        raise PermissionError(13, "Permission denied", str(out))
+
+    monkeypatch.setattr("autoflashcards.cli.write_csv", locked)
+    out = tmp_path / "deck.apkg"
+    result = runner.invoke(app, [str(FIXTURE), "--out", str(out), "--csv"])
+    assert result.exit_code == 1
+    assert f"Error: can't write {out.with_suffix('.csv')}. If it's open" in result.output
+    assert not isinstance(result.exception, PermissionError)  # a message, not a traceback

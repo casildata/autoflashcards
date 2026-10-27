@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `--preview` prints the cards, numbered with their rule and source line, instead of writing a deck; `--preview-file FILE` saves that list to a file. An output file that another program has open (Excel locks a `.csv` it shows) now stops the run with a one-line message instead of a traceback.
 - `--csv` opens cleanly in Excel: comma-separated (Excel doesn't split a double-clicked `.csv` on tabs), UTF-8 with a BOM (without one, Excel showed "·" as "Â·"), Front, Back and Tags first with the note ID last, and a `#columns` line that names the columns for Anki and serves as Excel's header row.
 - The run ends with dropped cards counted by reason (`Dropped 3 card(s): 2 same front as an earlier card, 1 too long; run with --json to review them`), also when no cards are left. Before, it said "dropped as duplicates or too long" whatever the reason. `eval/score.py` no longer crashes when its output is piped or redirected on Windows.
 - CI `dependencies` job: a license gate (`pip-licenses`, fails on GPL-family licenses and packages that state none; `frozendict`, LGPL-3.0 and required by `genanki`, is the one reviewed exception) and `pip-audit`, both run against a clean install of `.[ai]`. README: License section; the source line already shows PDF page numbers.

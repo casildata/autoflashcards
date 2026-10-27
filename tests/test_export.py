@@ -10,6 +10,7 @@ from autoflashcards.export import (
     BASIC_MODEL_ID,
     CLOZE_MODEL_ID,
     note_guid,
+    preview_text,
     write_apkg,
     write_csv,
     write_json,
@@ -101,3 +102,20 @@ def test_json_lists_blocks_cards_and_drops(tmp_path):
     assert data["blocks"][0]["text"] == "Osmosis: movement of water"
     assert data["cards"][0]["source_label"] == "cells.md · Cell Biology › Transport"
     assert data["removed"][0]["reason"] == "too long"
+
+
+def test_preview_text():
+    bullets = Card("Kinases", "Add phosphates\nWork in cascades", "bold_term_bullets", "x.md")
+    assert preview_text([CARDS[0], bullets, CARDS[2]]) == (
+        "1. Osmosis\n"
+        "   movement of water\n"
+        "   (term_colon; cells.md · Cell Biology › Transport)\n"
+        "\n"
+        "2. Kinases\n"
+        "   Add phosphates\n"
+        "   Work in cascades\n"
+        "   (bold_term_bullets; x.md)\n"
+        "\n"
+        "3. {{c1::Cells}} are the unit of life.\n"
+        "   (definition_sentence; cells.md · p.1)\n"
+    )

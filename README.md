@@ -127,7 +127,7 @@ autoflashcards lecture3.pdf                                        # writes lect
 autoflashcards week1.md week2.pdf --deck "Bio 101" --out bio.apkg
 ```
 
-If any cards were dropped, the run says how many and why (for example `Dropped 3 card(s): 2 same front as an earlier card, 1 too long`), so you know when to look at the `--json` file.
+If any cards were dropped, the run says how many and why (for example `Dropped 3 card(s): 2 same front as an earlier card, 1 too long`), so you know when to look at the `--json` file. If an output file is open in another program (Excel locks the `.csv` while it's open), the run stops with a message asking you to close it.
 
 Then in Anki: **File → Import**, and pick the `.apkg` file.
 
@@ -137,6 +137,8 @@ Then in Anki: **File → Import**, and pick the `.apkg` file.
 | `--deck NAME` | Deck name in Anki (default: the first input's name) |
 | `--csv` | Also write a `.csv` that opens in Excel with one column per field, and imports into Anki 2.1.55+ with no column mapping. It uses Anki's built-in Basic and Cloze note types, which have no Source field, so the source line goes at the end of the Back field; use the `.apkg` to keep Source as its own field |
 | `--json` | Also write a `.json` with everything extracted, every card, and every dropped card with the reason. It is written even when no cards are found, which is when it helps most |
+| `--preview` | Print the cards in the terminal instead of writing a deck, to try `--rules` and `--ai` choices quickly. `--json` is still written |
+| `--preview-file FILE` | Same, but save the list to a text file |
 | `--rules a,b` | Use only these rules (see [Rules](#rules)) |
 | `--ai claude` / `claude-code` / `ollama` | Also make cards with a language model (see [AI cards](#ai-cards-optional)) |
 | `--model NAME` | Model for `--ai` (default: `claude-haiku-5-5`, or `llama3.2` for Ollama) |
@@ -288,7 +290,6 @@ autoflashcards/
 ## Roadmap
 
 - Tell the user when a PDF's pages have no text layer (scanned), instead of only "No cards found"; later, OCR for those pages.
-- `--preview`: print the cards in the terminal without writing a deck, to try `--rules` and `--ai` choices quickly.
 - Folder input (`autoflashcards course/`), with size, page and time limits per file.
 - An option for the AI stage to skip text that already gave a rule card, which would cut the repeats behind most of its precision loss.
 - Read PowerPoint (`.pptx`) files directly, including slide levels and speaker notes.

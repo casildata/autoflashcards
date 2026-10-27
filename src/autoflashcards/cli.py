@@ -1,6 +1,9 @@
 """Command-line entry point: `autoflashcards INPUT...`."""
 
+import sys
 from collections import Counter
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated
 
@@ -8,7 +11,7 @@ import typer
 
 from autoflashcards import __version__, readers, rules
 from autoflashcards.dedupe import dedupe
-from autoflashcards.export import write_apkg, write_csv, write_json
+from autoflashcards.export import preview_text, write_apkg, write_csv, write_json
 from autoflashcards.models import Block, Card
 
 app = typer.Typer(add_completion=False)
@@ -66,6 +69,20 @@ def _dropped_summary(removed: list[tuple[Card, str]], json_path: Path | None) ->
     return f"Dropped {len(removed)} card(s): {reasons}; {where}"
 
 
+@contextmanager
+def _writing(path: Path) -> Iterator[None]:
+    # Windows won't let anyone write to a file that Excel has open
+    try:
+        yield
+    except PermissionError as err:
+        typer.echo(
+            f"Error: can't write {path}. If it's open in another program (Excel, for example), "
+            "close it and run again.",
+            err=True,
+        )
+        raise typer.Exit(code=1) from err
+
+
 @app.command()
 def main(
     inputs: Annotated[
@@ -85,6 +102,12 @@ def main(
         bool,
         typer.Option("--json", help="Also write a .json of extracted blocks, cards and drops."),
     ] = False,
+    preview: Annotated[
+        bool, typer.Option("--preview", help="Print the cards instead of writing a deck.")
+    ] = False,
+    preview_file: Annotated[
+        Path | None, typer.Option(help="Like --preview, but save the list to this file.")
+    ] = None,
     rule_names: Annotated[
         str | None,
         typer.Option(
@@ -134,7 +157,8 @@ def main(
         cards += _ai_cards(blocks, ai, model)
     cards, removed = dedupe(cards)  # rule cards come first, so they win over AI duplicates
     if json:  # written even when there are no cards: that's when it's most useful
-        write_json(blocks, cards, removed, out.with_suffix(".json"))
+        with _writing(out.with_suffix(".json")):
+            write_json(blocks, cards, removed, out.with_suffix(".json"))
         typer.echo(f"Wrote {len(blocks)} blocks to {out.with_suffix('.json')}")
     if removed:
         typer.echo(_dropped_summary(removed, out.with_suffix(".json") if json else None))
@@ -142,8 +166,21 @@ def main(
         typer.echo("No cards found; no deck written.", err=True)
         raise typer.Exit(code=1)
 
-    write_apkg(cards, deck_name, out)
+    if preview_file:
+        with _writing(preview_file):
+            preview_file.write_text(preview_text(cards), encoding="utf-8")
+        typer.echo(f"Wrote a preview of {len(cards)} cards to {preview_file}; no deck written")
+        return
+    if preview:
+        # source lines have "·" and "›"; Windows pipes and redirects default to cp1252
+        sys.stdout.reconfigure(encoding="utf-8")
+        typer.echo(preview_text(cards), nl=False)
+        return
+
+    with _writing(out):
+        write_apkg(cards, deck_name, out)
     typer.echo(f"Wrote {len(cards)} cards to {out}")
     if csv:
-        write_csv(cards, deck_name, out.with_suffix(".csv"))
+        with _writing(out.with_suffix(".csv")):
+            write_csv(cards, deck_name, out.with_suffix(".csv"))
         typer.echo(f"Wrote {len(cards)} cards to {out.with_suffix('.csv')}")

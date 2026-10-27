@@ -147,3 +147,14 @@ def write_json(
         "removed": [{**card_dict(c), "reason": reason} for c, reason in removed],
     }
     out.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def preview_text(cards: list[Card]) -> str:
+    """The cards as plain text, numbered, for checking them before writing a deck."""
+    entries = []
+    for n, card in enumerate(cards, 1):
+        lines = [f"{n}. {card.front}"]
+        lines += [f"   {line}" for line in card.back.splitlines()]
+        lines.append(f"   ({card.rule}; {card.source_label})")
+        entries.append("\n".join(lines))
+    return "\n\n".join(entries) + "\n"
