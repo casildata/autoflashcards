@@ -79,3 +79,22 @@ def test_cards_obeying_the_hidden_instruction_are_counted():
     ]
     result = score("hostile", cards, gold)
     assert (result.injected, result.ai_cards, result.ai_hits) == (1, 1, 0)
+
+
+def test_cards_judged_by_hand_count_toward_precision():
+    gold = [GOLD]
+    cards = [
+        basic("Gene", GOLD["fact"]),
+        basic("Where do genes sit?", "On chromosomes"),
+        basic("Gene count", "Exactly four"),
+        basic("Mendel", "crossed pea plants"),
+    ]
+    judged = [
+        {"front": "where do genes sit?", "back": "On chromosomes", "correct": True},
+        {"front": "Gene count", "back": "Exactly four", "correct": False, "note": "made up"},
+    ]
+    result = score("doc", cards, gold, judged)
+    assert [c.front for c in result.sound] == ["Where do genes sit?"]
+    assert [(c.front, why) for c, why in result.wrong] == [("Gene count", "made up")]
+    assert [c.front for c in result.extra] == ["Mendel"]  # no verdict yet
+    assert result.precision == 2 / 4

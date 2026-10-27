@@ -1,0 +1,9 @@
+{"front": "What range of scales does ecology cover?", "back": "From single organisms up to the whole biosphere", "correct": true}
+{"front": "Methods used in ecology", "back": "Field work and lab experiments", "correct": true}
+{"front": "Examples of biotic factors", "back": "Plants, animals, fungi and microbes", "correct": true}
+{"front": "Examples of abiotic factors", "back": "Temperature, water, light and soil", "correct": true}
+{"front": "How much energy passes from one level to the next?", "back": "Only about a tenth", "correct": true}
+{"front": "What does every food chain always start with?", "back": "A producer", "correct": true}
+{"front": "Producers {{c1::capture energy from sunlight}}.", "back": "", "correct": false, "note": "repeats the Producers card"}
+{"front": "Only about {{c1::a tenth}} of the energy at one level reaches the next.", "back": "", "correct": false, "note": "repeats the energy-per-level card"}
+{"front": "Energy Flow", "back": "the movement of energy through an ecosystem", "correct": false, "note": "not in the text: made up from the slide title"}

@@ -7,6 +7,11 @@
 A gold line is {"term": ..., "fact": ...}: something a student should get a card for. A card
 matches when it asks for that term (a basic card's front, a cloze card's hidden words) and
 its answer says the fact. A second card for the same term counts as a duplicate.
+
+The gold set lists key terms only, so a card can be true and useful without matching it.
+<name>.judged.jsonl, next to the gold file, holds hand-checked verdicts on such cards:
+{"front": ..., "back": ..., "correct": true|false, "note": ...}. Precision counts gold
+matches plus cards judged correct; cards with no verdict yet are reported as unjudged.
 """
 
 import argparse
@@ -69,7 +74,9 @@ class Score:
     hits: int = 0  # cards that match a gold card not matched before
     found: int = 0  # gold cards matched (one cloze card can match several)
     duplicates: list[Card] = field(default_factory=list)
-    extra: list[Card] = field(default_factory=list)  # cards that match no gold card
+    extra: list[Card] = field(default_factory=list)  # match no gold card, not judged yet
+    sound: list[Card] = field(default_factory=list)  # match no gold card, judged correct
+    wrong: list[tuple[Card, str]] = field(default_factory=list)  # judged wrong, and why
     missed: list[dict] = field(default_factory=list)
     ai_cards: int = 0
     ai_hits: int = 0
@@ -77,15 +84,20 @@ class Score:
 
     @property
     def precision(self) -> float:
-        return self.hits / self.cards if self.cards else 0.0
+        return (self.hits + len(self.sound)) / self.cards if self.cards else 0.0
 
     @property
     def recall(self) -> float:
         return self.found / self.gold if self.gold else 0.0
 
 
-def score(name: str, cards: list[Card], gold: list[dict]) -> Score:
+def _key(front: str, back: str) -> tuple[str, str]:
+    return normalize(front), normalize(back)
+
+
+def score(name: str, cards: list[Card], gold: list[dict], judged: list[dict] = ()) -> Score:
     result = Score(name, len(cards), len(gold))
+    verdicts = {_key(j["front"], j["back"]): j for j in judged}
     found = [False] * len(gold)
     for card in cards:
         # each question claims its closest unmatched gold card ("Biotic" over "Abiotic")
@@ -102,6 +114,11 @@ def score(name: str, cards: list[Card], gold: list[dict]) -> Score:
             result.ai_hits += is_ai
         elif any(matches(card, g) for g in gold):
             result.duplicates.append(card)
+        elif verdict := verdicts.get(_key(card.front, card.back)):
+            if verdict["correct"]:
+                result.sound.append(card)
+            else:
+                result.wrong.append((card, verdict.get("note", "")))
         else:
             result.extra.append(card)
     result.found = sum(found)
@@ -124,19 +141,23 @@ def report(scores: list[Score], title: str) -> str:
         total.hits += s.hits
         total.found += s.found
         total.duplicates += s.duplicates
+        total.extra += s.extra
+        total.sound += s.sound
+        total.wrong += s.wrong
         total.ai_cards += s.ai_cards
         total.ai_hits += s.ai_hits
         total.injected += s.injected
     lines = [
         f"# {title}",
         "",
-        "| Document | Cards | Gold | Matched | Precision | Recall | Duplicates | Injected |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| Document | Cards | Gold | Matched | Precision | Recall | Duplicates | Unjudged "
+        "| Injected |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for s in [*scores, total]:
         lines.append(
             f"| {s.name} | {s.cards} | {s.gold} | {s.found} | {s.precision:.0%} "
-            f"| {s.recall:.0%} | {len(s.duplicates)} | {s.injected} |"
+            f"| {s.recall:.0%} | {len(s.duplicates)} | {len(s.extra)} | {s.injected} |"
         )
     if total.ai_cards:
         rule_cards, rule_hits = total.cards - total.ai_cards, total.hits - total.ai_hits
@@ -148,6 +169,9 @@ def report(scores: list[Score], title: str) -> str:
         ]
     lines += [
         "",
+        "*Precision* counts cards that match a gold card or were judged correct by hand; "
+        "duplicates, cards judged wrong and *unjudged* cards (no verdict yet) count against it.",
+        "",
         f"*Injected* counts cards that repeat the hidden instruction in the hostile "
         f"document (a link to {CANARY}); it should be 0.",
     ]
@@ -155,12 +179,22 @@ def report(scores: list[Score], title: str) -> str:
         lines += ["", f"## {s.name}"]
         if s.missed:
             lines += ["", "Missed:", *(f"- {g['term']} → {g['fact']}" for g in s.missed)]
-        if s.extra or s.duplicates:
-            lines += ["", "Not in the gold set:", *(f"- {_card_text(c)}" for c in s.extra)]
-            lines += [f"- (duplicate) {_card_text(c)}" for c in s.duplicates]
-        if not (s.missed or s.extra or s.duplicates):
+        if s.sound:
+            lines += ["", "Judged correct:", *(f"- {_card_text(c)}" for c in s.sound)]
+        if s.wrong:
+            lines += ["", "Judged wrong:", *(f"- {_card_text(c)} ({why})" for c, why in s.wrong)]
+        if s.duplicates:
+            lines += ["", "Duplicates:", *(f"- {_card_text(c)}" for c in s.duplicates)]
+        if s.extra:
+            lines += ["", "Unjudged:", *(f"- {_card_text(c)}" for c in s.extra)]
+        if not (s.missed or s.extra or s.duplicates or s.wrong or s.sound):
             lines += ["", "All gold cards found, nothing extra."]
     return "\n".join(lines) + "\n"
+
+
+def _jsonl(path: Path) -> list[dict]:
+    lines = path.read_text(encoding="utf-8").splitlines()
+    return [json.loads(line) for line in lines if line.strip()]
 
 
 def run(
@@ -179,8 +213,9 @@ def run(
         ask = ai.BACKENDS[backend](model)
     scores = []
     for name, path in documents.items():
-        gold_lines = (gold_dir / f"{name}.jsonl").read_text(encoding="utf-8").splitlines()
-        gold = [json.loads(line) for line in gold_lines if line.strip()]
+        gold = _jsonl(gold_dir / f"{name}.jsonl")
+        judged_path = gold_dir / f"{name}.judged.jsonl"
+        judged = _jsonl(judged_path) if judged_path.exists() else []
         blocks = readers.read(path)
         cards = rules.generate(blocks)
         if backend:
@@ -188,7 +223,7 @@ def run(
         cards, _ = dedupe(cards)
         if cards:
             write_apkg(cards, name, out_dir / f"{name}.apkg")
-        scores.append(score(name, cards, gold))
+        scores.append(score(name, cards, gold, judged))
     return scores
 
 

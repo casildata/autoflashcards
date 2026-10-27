@@ -1,0 +1,6 @@
+{"front": "What three variables does the RFM model score customers on?", "back": "Recency, frequency, monetary value", "correct": true}
+{"front": "Each variable is split into {{c1::five equal groups}}, so every customer gets a score from 111 to 555.", "back": "", "correct": true}
+{"front": "Range of an RFM score", "back": "111 to 555", "correct": true}
+{"front": "Which RFM customers are the most loyal?", "back": "Those with high scores on all three variables", "correct": true}
+{"front": "RFM model", "back": "a model that scores each customer on three variables", "correct": true}
+{"front": "RFM segment", "back": "a group of customers based on their RFM scores", "correct": false, "note": "not in the text: only a figure caption names it"}

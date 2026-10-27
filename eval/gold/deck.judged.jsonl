@@ -1,0 +1,6 @@
+{"front": "Phospholipid heads", "back": "Water-loving, face outward", "correct": true}
+{"front": "Phospholipid tails", "back": "Water-fearing, face inward", "correct": true}
+{"front": "Integral proteins {{c1::span the whole membrane}}", "back": "", "correct": false, "note": "repeats the Integral proteins card"}
+{"front": "Many integral proteins act as {{c1::channels}}", "back": "", "correct": true}
+{"front": "Water-loving heads", "back": "face outward", "correct": true}
+{"front": "Water-fearing tails", "back": "face inward", "correct": true}

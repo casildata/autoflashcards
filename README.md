@@ -96,12 +96,12 @@ With AI cards added, on the same documents:
 |---|---:|---:|---:|
 | Cards | 27 | 57 | 43 |
 | Recall | 80% | **94%** | **97%** |
-| Precision | **100%** | 56% | 77% |
+| Precision | **100%** | 86% | 84% |
 | Cards obeying the hidden instruction | 0 | **0** | **0** |
 
-Both models find the plain-statement facts the rules miss. Precision mostly measures style here: the gold set lists key terms only, Llama writes term → definition cards that match it, and Haiku also writes cards the gold set doesn't list, most of them sound ("Examples of abiotic factors → Temperature, water, light and soil", "Range of an RFM score → 111 to 555"). Llama's few extras include definitions it made up from the slide title ("Energy Flow → the movement of energy through an ecosystem"). Both repeat some rule-card facts in another form. `outputs/eval-<backend>.md` lists every card. On a real 4-slides-per-page lecture handout, the AI took the deck from 19 to 36 cards in one request.
+Both models find the plain-statement facts the rules miss. The gold set lists key terms only, so the AI cards it doesn't list were checked by hand (`eval/gold/<name>.judged.jsonl`): most are sound ("Examples of abiotic factors → Temperature, water, light and soil", "Range of an RFM score → 111 to 555"). What costs precision is repeats of rule-card facts in another form (5 cards with each model, plus 3 Haiku cloze cards) and, for Llama, definitions it made up from a slide title or figure caption ("Energy Flow → the movement of energy through an ecosystem"). `outputs/eval-<backend>.md` lists every card. On a real 4-slides-per-page lecture handout, the AI took the deck from 19 to 36 cards in one request.
 
-*Precision* is the share of cards that match a gold card; *recall* is the share of gold cards found (one cloze note with two deletions can find two). Missed today: facts phrased as plain statements ("Producers capture energy from sunlight", "Dominant alleles hide the effect of recessive ones"). Telling those apart from any other sentence needs grammar analysis or the planned AI stage. Real PDFs are messier than these documents, so expect lower precision on your own files.
+*Precision* is the share of cards that match a gold card or were judged correct by hand; repeats, wrong cards and cards with no verdict yet (*unjudged*, listed in the report) count against it. *Recall* is the share of gold cards found (one cloze note with two deletions can find two). Missed today: facts phrased as plain statements ("Producers capture energy from sunlight", "Dominant alleles hide the effect of recessive ones"). Telling those apart from any other sentence needs grammar analysis or the AI stage. Real PDFs are messier than these documents, so expect lower precision on your own files.
 
 ```
 python eval/score.py              # writes outputs/eval.md and a deck per document

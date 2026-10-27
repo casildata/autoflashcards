@@ -1,0 +1,4 @@
+{"front": "Genes sit at fixed places on {{c1::chromosomes}}, and each body cell has two copies of most of them, one from each parent.", "back": "", "correct": true}
+{"front": "One gene can have many alleles in a population, though each person carries at most {{c1::two}}.", "back": "", "correct": true}
+{"front": "{{c1::Dominant}} alleles hide the effect of recessive ones.", "back": "", "correct": true}
+{"front": "When does a recessive allele show?", "back": "Only when both copies of the gene are recessive", "correct": true}
