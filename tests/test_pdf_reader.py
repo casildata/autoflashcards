@@ -21,6 +21,7 @@ EXPECTED = [
     (3, "heading", (CB,), ORG),
     (3, "paragraph", (CB, ORG), "Mitochondrion: the site of aerobic respiration."),
     (3, "paragraph", (CB, ORG), "Ribosome: assembles proteins from amino acids."),
+    (3, "paragraph", (CB, ORG), "Lysosome breaks down waste inside the cell."),
 ]  # fmt: skip
 
 
@@ -28,6 +29,13 @@ def test_lecture_pdf_blocks(cells_pdf):
     blocks = read(cells_pdf)
     assert [(b.page, b.kind, b.heading_path, b.text) for b in blocks] == EXPECTED
     assert {b.source for b in blocks} == {"cells.pdf"}
+
+
+def test_bold_lead_text(cells_pdf):
+    leads = {b.text.split()[0]: b.bold_lead for b in read(cells_pdf) if b.kind != "heading"}
+    assert leads["Osmosis:"] == "Osmosis:"
+    assert leads["Lysosome"] == "Lysosome"
+    assert leads["Mitochondrion:"] == ""  # not bold
 
 
 def test_two_columns_are_read_left_column_first(two_column_pdf):

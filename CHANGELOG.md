@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- New rules: `bold_lead` (a bold term followed by text) and `definition_sentence` ("X is a…", "X refers to…" sentences become cloze cards). Rules run in order and the first match per block wins. `--rules` picks a subset.
+- Filter stage: cards with the same front, near-duplicates (rapidfuzz ratio ≥ 90) and overly long or empty cards are dropped, with a reason.
+- `--csv` writes an Anki text-import file with file headers (built-in Basic and Cloze note types, same note IDs as the `.apkg`). `--json` writes blocks, cards and dropped cards.
+- Running headers and footers are found on 40% of pages instead of half, which catches books that alternate left and right page footers.
+
 - PDF input (pdfplumber). The structure stage finds headings by font size and bold text, removes running headers, footers and page numbers, joins wrapped lines and hyphenated words, and reads two-column pages left column first. Cards from PDFs show their page number.
 - Word spacing scales with font size, and duplicated glyphs are removed, which fixes run-together and split words in some typeset PDFs. Glyphs the PDF doesn't map to text become U+FFFD; at the start of a line they are read as bullets.
 - `term_colon` skips figure and table captions, `Keywords:`/`Abstract:` labels, and anything under a References or Bibliography heading.

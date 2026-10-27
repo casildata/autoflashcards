@@ -28,6 +28,15 @@ def test_block_kinds_and_heading_paths():
     )
 
 
+def test_bold_lead():
+    leads = {b.text: b.bold_lead for b in read(FIXTURE)}
+    assert leads["Golgi apparatus packages proteins for transport out of the cell."] == (
+        "Golgi apparatus"
+    )
+    assert leads["Osmosis: movement of water across a semipermeable membrane."] == "Osmosis"
+    assert leads["Diffusion: net movement of particles from high to low concentration."] == ""
+
+
 def test_code_blocks_are_skipped():
     assert not any("nucleus" in b.text for b in read(FIXTURE))
 

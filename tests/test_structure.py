@@ -87,6 +87,25 @@ def test_running_headers_footers_and_page_numbers_are_dropped():
     assert [text for _, _, text in blocks(lines)] == [f"Body text on page {p}." for p in (1, 2, 3)]
 
 
+def test_footers_on_alternate_pages_are_dropped():
+    # books put the page number on the left of even pages and the right of odd ones
+    body = ["Alpha.", "Beta.", "Gamma.", "Delta.", "Epsilon.", "Zeta."]
+    lines = []
+    for page, text in enumerate(body, start=1):
+        footer = f"{page} © Publisher" if page % 2 == 0 else f"© Publisher {page}"
+        lines += [line(text, 100, page), line(footer, 750, page)]
+    assert [text for _, _, text in blocks(lines)] == body
+
+
+def test_bold_lead_is_kept_only_when_it_starts_the_block():
+    def lead(text, bold_lead):
+        return to_blocks([Line(text, 1, BODY, False, 72, 100, 110, bold_lead)], "x.pdf")[0]
+
+    assert lead("Mitosis divides a cell.", "Mitosis").bold_lead == "Mitosis"
+    assert lead("• Mitosis divides a cell.", "Mitosis").bold_lead == "Mitosis"  # after marker
+    assert lead("A cell divides.", "cell").bold_lead == ""
+
+
 def test_heading_levels_from_size_then_bold():
     result = blocks([
         line("Chapter", 50, size=20),

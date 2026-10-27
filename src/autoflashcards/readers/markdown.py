@@ -19,6 +19,20 @@ def _plain_text(inline: Token) -> str:
     return "".join(parts).strip()
 
 
+def _bold_lead(inline: Token) -> str:
+    """Text of a **bold** span that opens the inline, or ""."""
+    children = [c for c in inline.children or [] if not (c.type == "text" and not c.content)]
+    if not children or children[0].type != "strong_open":
+        return ""
+    parts = []
+    for child in children[1:]:
+        if child.type == "strong_close":
+            return "".join(parts).strip()
+        if child.type in ("text", "code_inline"):
+            parts.append(child.content)
+    return ""
+
+
 def read_markdown(path: Path) -> list[Block]:
     tokens = MarkdownIt().parse(path.read_text(encoding="utf-8"))
     blocks: list[Block] = []
@@ -44,5 +58,6 @@ def read_markdown(path: Path) -> list[Block]:
                 headings.append((heading_level, text))
             elif parent == "paragraph_open":
                 kind = "bullet" if list_depth else "paragraph"
-                blocks.append(Block(kind, text, path.name, tuple(h for _, h in headings)))
+                path_now = tuple(h for _, h in headings)
+                blocks.append(Block(kind, text, path.name, path_now, bold_lead=_bold_lead(token)))
     return blocks

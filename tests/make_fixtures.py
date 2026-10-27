@@ -13,7 +13,8 @@ WIDTH, HEIGHT = letter
 LEFT, TOP = 72, HEIGHT - 72
 
 # (kind, text) per page. Kinds: title (20pt), h1 (14pt bold), h2 (body size, bold),
-# para (body), bullet ("•" + indented text), term (bold term, regular definition), gap
+# para (body), bullet ("•" + indented text), term (bold term, regular definition),
+# lead (bold text before "|", regular after), gap
 PAGES = [
     [
         ("title", "Cell Biology"),
@@ -36,6 +37,7 @@ PAGES = [
         ("h1", "Organelles"),
         ("para", "Mitochondrion: the site of aerobic respiration."),
         ("para", "Ribosome: assembles proteins from amino acids."),
+        ("lead", "Lysosome|breaks down waste inside the cell."),
     ],
 ]
 
@@ -65,12 +67,17 @@ def build_cells_pdf(path: Path) -> Path:
                 y -= 18
             elif kind == "gap":
                 y -= 10
-            elif kind == "term":
-                term, definition = text.split(":", 1)
+            elif kind in ("term", "lead"):
+                if kind == "term":
+                    term, definition = text.split(":", 1)
+                    term += ":"
+                else:
+                    term, definition = text.split("|")
                 canvas.setFont(BOLD, BODY)
-                canvas.drawString(LEFT, y, term + ":")
+                canvas.drawString(LEFT, y, term)
                 canvas.setFont(REGULAR, BODY)
-                canvas.drawString(LEFT + canvas.stringWidth(term + ": ", BOLD, BODY), y, definition)
+                x = LEFT + canvas.stringWidth(term + " ", BOLD, BODY)
+                canvas.drawString(x, y, definition.strip())
                 y -= 15
             else:
                 canvas.setFont(REGULAR, BODY)

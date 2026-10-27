@@ -20,6 +20,11 @@ Cells are the basic unit of life.
 
 Mitochondrion: the site of aerobic respiration.
 
+- **Golgi apparatus** packages proteins for transport out of the cell.
+- **Vacuole**: stores water and nutrients.
+
+A ribosome is a structure that builds proteins. It is a very small organelle.
+
 The most important things to remember for the exam are these: structure and function.
 
 ```yaml

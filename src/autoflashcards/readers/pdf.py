@@ -83,6 +83,17 @@ def _text(chars: list[dict]) -> str:
     return extract_text(chars, x_tolerance_ratio=WORD_GAP_RATIO)
 
 
+def _bold_lead(chars: list[dict]) -> str:
+    """Text of the bold run that starts a line, allowing a short marker such as "1." first."""
+    visible = sorted(_visible(chars), key=lambda c: c["x0"])
+    bold = [_is_bold(c["fontname"]) for c in visible]
+    start = bold.index(True) if True in bold else None
+    if start is None or start > 3:
+        return ""
+    end = bold.index(False, start) if False in bold[start:] else len(bold)
+    return _text(visible[start:end])
+
+
 def read_lines(path: Path) -> list[Line]:
     lines = []
     try:
@@ -105,6 +116,7 @@ def read_lines(path: Path) -> list[Line]:
                             x0=min(c["x0"] for c in visible),
                             top=_top(chars),
                             bottom=max(c["bottom"] for c in visible),
+                            bold_lead=_bold_lead(chars),
                         )
                     )
     except Exception as err:  # pdfminer raises many types for damaged or encrypted files

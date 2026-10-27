@@ -14,6 +14,7 @@ from autoflashcards.models import Block, Line
 HEADING_SIZE_RATIO = 1.2  # a line this much larger than body text is a heading
 MAX_HEADING_WORDS = 15
 MAX_BOLD_HEADING_WORDS = 8  # a body-size line that is all bold, short, and unpunctuated
+RUNNING_TEXT_SHARE = 0.4  # top/bottom text on this share of pages is a header or footer
 
 # The PDF reader writes glyphs it can't map to text as U+FFFD; at the start of a line one is
 # almost always a bullet, anywhere else it is dropped
@@ -27,12 +28,13 @@ def _clean(line: Line) -> Line:
     text = unicodedata.normalize("NFKC", line.text)  # ligatures such as "ﬁ" become "fi"
     if not _BULLET.match(text):
         text = text.replace(_UNMAPPED, "")
-    return replace(line, text=" ".join(text.split()))
+    lead = unicodedata.normalize("NFKC", line.bold_lead)
+    return replace(line, text=" ".join(text.split()), bold_lead=" ".join(lead.split()))
 
 
 def _drop_running_text(lines: list[Line]) -> list[Line]:
     """Remove page numbers and running headers/footers: a page's top or bottom line that is
-    a bare page number, or that repeats at the same height on most pages."""
+    a bare page number, or that repeats at the same height on many pages."""
     lines = [line for line in lines if line.text]
     pages = {line.page for line in lines}
 
@@ -53,7 +55,9 @@ def _drop_running_text(lines: list[Line]) -> list[Line]:
         pages_with[key(line)].add(line.page)
 
     def running(line: Line) -> bool:
-        repeated = len(pages) >= 2 and len(pages_with[key(line)]) > len(pages) / 2
+        # 40%, not half: books alternate left- and right-page headers and footers
+        count = len(pages_with[key(line)])
+        repeated = count >= 2 and count >= RUNNING_TEXT_SHARE * len(pages)
         return at_edge(line) and (repeated or bool(_PAGE_NUMBER.match(line.text)))
 
     return [line for line in lines if not running(line)]
@@ -130,9 +134,10 @@ def to_blocks(lines: list[Line], source: str) -> list[Block]:
         nonlocal open_block
         if open_block:
             path = tuple(h for _, h in headings)
-            blocks.append(
-                Block(open_block.kind, _join(open_block.texts), source, path, open_block.page)
-            )
+            text = _join(open_block.texts)
+            lead = open_block.first.bold_lead
+            lead = lead if lead and text.startswith(lead) else ""
+            blocks.append(Block(open_block.kind, text, source, path, open_block.page, lead))
         open_block = None
 
     for line in lines:

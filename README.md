@@ -20,7 +20,27 @@ autoflashcards week1.md week2.pdf --deck "Bio 101" --out bio.apkg
 
 Then in Anki: **File → Import** and pick the `.apkg` file.
 
-Lines written as `Term: definition` become cards, with the term on the front and the definition on the back. Figure and table captions, labels such as `Note:` and reference lists are skipped.
+| Option | Does |
+|---|---|
+| `--out FILE` | Where to write the deck (default: the first input's name, `.apkg`) |
+| `--deck NAME` | Deck name in Anki (default: the first input's name) |
+| `--csv` | Also write a `.csv` for Anki's text import (Anki 2.1.55+, built-in Basic and Cloze note types) |
+| `--json` | Also write a `.json` with everything extracted, every card, and every dropped card with the reason. Written even when no cards are found, which is when it helps most |
+| `--rules a,b` | Use only these rules (see below) |
+
+## How cards are made
+
+Each paragraph or bullet is checked against these rules in order; the first one that matches makes the card(s), so one fact doesn't become two cards.
+
+| Rule | Your notes say | Card |
+|---|---|---|
+| `term_colon` | `Osmosis: movement of water across a membrane.` | **Osmosis** → movement of water across a membrane. |
+| `bold_lead` | **Mitosis** divides a cell into two identical cells. | **Mitosis** → divides a cell into two identical cells. |
+| `definition_sentence` | A ribosome is a structure that builds proteins. | Cloze: A [...] is a structure that builds proteins. |
+
+`definition_sentence` looks for "X is a / are the / was an / is defined as / is called / is known as / refers to …", and skips sentences whose subject is a pronoun ("It is a…", "There are…").
+
+Skipped everywhere: figure and table captions, labels such as `Note:` or `Keywords:`, and anything under a References or Bibliography heading. Cards with the same front, near-identical cards (90% similar or more) and overly long cards are dropped; `--json` lists them.
 
 For PDFs, headings are found by font size and bold text, running headers, footers and page numbers are removed, and two-column pages are read left column first.
 
@@ -41,7 +61,7 @@ That is the file, then the headings the line sat under. For PDFs it will also sh
 | Tag | Example | Meaning |
 |---|---|---|
 | Headings | `cell_biology::transport` | The headings the card came from, lowercased with spaces turned into `_`. Click a folder in the sidebar to study one chapter or section. |
-| Rule | `afg::rule::term_colon` | Which autoflashcards rule made the card (`afg` = autoflashcards). `term_colon` means it came from a `Term: definition` line. |
+| Rule | `afg::rule::term_colon` | Which autoflashcards rule made the card (`afg` = autoflashcards): `term_colon`, `bold_lead` or `definition_sentence`, as in the table above. |
 
 Useful searches in the Anki browser:
 

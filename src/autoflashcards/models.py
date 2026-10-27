@@ -15,6 +15,7 @@ class Line:
     x0: float
     top: float  # distance from the top of the page
     bottom: float
+    bold_lead: str = ""  # bold text at the start of the line, after any bullet marker
 
 
 @dataclass(frozen=True)
@@ -24,16 +25,18 @@ class Block:
     source: str  # file name, shown on the card
     heading_path: tuple[str, ...] = ()  # headings above this block, outermost first
     page: int | None = None  # 1-based; None for formats without pages
+    bold_lead: str = ""  # bold text that starts the block, e.g. a term being defined
 
 
 @dataclass(frozen=True)
 class Card:
-    front: str
-    back: str
+    front: str  # for cloze cards, the full text with {{c1::...}} markup
+    back: str  # empty for cloze cards
     rule: str  # name of the rule that made the card
     source: str
     heading_path: tuple[str, ...] = ()
     page: int | None = None
+    kind: Literal["basic", "cloze"] = "basic"
 
     @property
     def source_label(self) -> str:
@@ -44,3 +47,8 @@ class Card:
         if self.heading_path:
             parts.append(" › ".join(self.heading_path))
         return " · ".join(parts)
+
+
+def normalize(text: str) -> str:
+    """Case- and whitespace-insensitive form, used for card IDs and duplicate checks."""
+    return " ".join(text.lower().split())
