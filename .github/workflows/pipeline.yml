@@ -74,6 +74,33 @@ jobs:
           name: eval
           path: outputs/
 
+  eval-ai:
+    # calls the Claude API, so it runs only when started by hand (Actions -> pipeline -> Run)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install package
+        run: pip install -e ".[dev]"
+
+      - name: Evaluate rules + Claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python eval/score.py --ai claude
+          cat outputs/eval-claude.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: eval-ai
+          path: outputs/
+
   secret-scan:
     runs-on: ubuntu-24.04
     steps:

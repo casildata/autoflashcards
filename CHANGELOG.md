@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- AI cards: `--ai claude` (Claude Haiku 5.5 by default, `anthropic` SDK structured output), `--ai claude-code` (runs `claude -p` on a Claude Pro/Max plan, no API key) or `--ai ollama` (local), with `--model`. Text goes in chunks of about 3,000 tokens; every card should quote its source line; cards whose quote, term or answer isn't in the document are dropped. One retry on a malformed reply, then the chunk is skipped with a warning; replies are cached on disk; requests and an input-token estimate are printed first. Install with `pip install ".[ai]"`.
+- Eval with `--ai claude-code`: recall 80% → 94%, precision 100% → 56% (many extra AI cards are sound but outside the term-only gold set), no card obeyed the hidden instruction.
+- Eval with `--ai ollama` (llama3.2 3B, local): recall 97%, precision 77%, no card obeyed the hidden instruction. Cards without a quote (small models often leave it empty) are kept when both term and answer come from the text. Ollama requests use a 16K context and a 4,096-token reply cap: the default 4K context left no room to answer and the model never stopped. The JSON schema also goes in the prompt, as Ollama's docs advise.
+- Eval: a hostile document with a hidden instruction aimed at AI models, an *Injected* column counting cards that obey it, and `eval/score.py --ai`. CI's `eval-ai` job runs it on manual trigger only.
+
 - `definition_sentence`: "X means Y" (before a noun phrase or "-ing" word), one cloze deletion per defining clause ("X means A, and Y means B" → c1, c2), and appositives ("Retention, the share of customers who return, is…"). Fixed: the sentence-start capital check was case-insensitive, so lowercase fragments could become cards. Eval recall 71% → 81%, precision unchanged at 100%; no change on the real PDFs checked.
 - `eval/score.py` counts each cloze deletion as a question, and each question claims only its closest gold card.
 

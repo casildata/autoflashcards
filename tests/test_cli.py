@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -83,3 +84,51 @@ def test_no_cards_exits_nonzero(tmp_path):
     assert result.exit_code == 1
     assert not (tmp_path / "x.apkg").exists()
     assert (tmp_path / "x.json").exists()  # still written, to show what was extracted
+
+
+def _fake_ai(monkeypatch, tmp_path, ask):
+    from autoflashcards import ai
+
+    monkeypatch.setattr(ai, "BACKENDS", {"claude": lambda model: ask, "ollama": ai.ollama})
+    monkeypatch.setattr("typer.get_app_dir", lambda name: str(tmp_path / "app"))
+
+
+def test_ai_cards_are_added_after_rule_cards(monkeypatch, tmp_path):
+    from autoflashcards.ai import AICard, AICards
+
+    reply = AICards(cards=[
+        AICard(kind="basic", front="Cell theory unit", back="the basic unit of life",
+               quote="Cells are the basic unit of life."),
+        # same front as a rule card: dropped as a duplicate
+        AICard(kind="basic", front="Osmosis", back="movement of water",
+               quote="movement of water across a semipermeable membrane"),
+    ])  # fmt: skip
+    _fake_ai(monkeypatch, tmp_path, lambda text: reply)
+    out = tmp_path / "deck.apkg"
+    result = runner.invoke(app, [str(FIXTURE), "--out", str(out), "--ai", "claude", "--json"])
+    assert result.exit_code == 0, result.output
+    assert "sends the text of your files to Anthropic" in result.output  # first run only
+    assert "Wrote 11 cards" in result.output
+    rules = [c["rule"] for c in json.loads(out.with_suffix(".json").read_text())["cards"]]
+    assert rules[-1] == "ai_claude" and rules.count("ai_claude") == 1
+
+    again = runner.invoke(app, [str(FIXTURE), "--out", str(out), "--ai", "claude"])
+    assert "sends the text" not in again.output
+
+
+def test_ai_backend_unavailable_exits_2(monkeypatch, tmp_path):
+    from autoflashcards import ai
+
+    def no_key(text):
+        raise ai.AIUnavailable("no Anthropic credentials")
+
+    _fake_ai(monkeypatch, tmp_path, no_key)
+    result = runner.invoke(app, [str(FIXTURE), "--out", str(tmp_path / "d.apkg"), "--ai", "claude"])
+    assert result.exit_code == 2
+    assert "no Anthropic credentials" in result.output
+
+
+def test_unknown_ai_backend(tmp_path):
+    result = runner.invoke(app, [str(FIXTURE), "--out", str(tmp_path / "d.apkg"), "--ai", "gpt"])
+    assert result.exit_code == 2
+    assert "--ai must be one of: claude, claude-code, ollama" in result.output

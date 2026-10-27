@@ -27,6 +27,8 @@ Then in Anki: **File → Import** and pick the `.apkg` file.
 | `--csv` | Also write a `.csv` for Anki's text import (Anki 2.1.55+, built-in Basic and Cloze note types) |
 | `--json` | Also write a `.json` with everything extracted, every card, and every dropped card with the reason. Written even when no cards are found, which is when it helps most |
 | `--rules a,b` | Use only these rules (see below) |
+| `--ai claude` / `claude-code` / `ollama` | Also make cards with a language model (see [AI cards](#ai-cards-optional)) |
+| `--model NAME` | Model for `--ai` (default: `claude-haiku-5-5`, or `llama3.2` for Ollama) |
 
 ## How cards are made
 
@@ -50,9 +52,34 @@ For PDFs, headings are found by font size and bold text, running headers, footer
 
 **Not yet supported:** scanned PDFs (pages that are images, with no text layer) produce no cards; OCR is planned. In PDFs, sub-bullets aren't told apart from bullets, so a bold term's back is "the bullets after it, up to the next bold term or slide".
 
+## AI cards (optional)
+
+The rules only catch facts written in recognizable patterns. `--ai` also sends the text to a language model, which can write cards from plain statements like "Producers capture energy from sunlight". Rule cards are kept first; AI cards that repeat them are dropped as duplicates. AI cards are tagged `afg::rule::ai_<backend>`.
+
+```
+pip install ".[ai]"
+autoflashcards lecture3.pdf --ai claude-code   # your Claude Pro or Max plan, through Claude Code
+autoflashcards lecture3.pdf --ai claude        # Anthropic API: needs ANTHROPIC_API_KEY and API credit
+autoflashcards lecture3.pdf --ai ollama        # a local model: nothing leaves your computer
+```
+
+| Backend | Needs | Pays with |
+|---|---|---|
+| `claude-code` | [Claude Code](https://code.claude.com) installed and logged in | your Claude Pro/Max plan's usage limits; no API key |
+| `claude` | `ANTHROPIC_API_KEY` from [the Console](https://console.anthropic.com) | prepaid API credit (Pro doesn't include any) |
+| `ollama` | [Ollama](https://ollama.com) running, `ollama pull llama3.2` | nothing; runs on your computer (a 3B model fits a 6 GB GPU) |
+
+`claude-code` runs `claude -p` with its own system prompt, no tools (no file, shell or web access), a JSON schema for the reply and no saved session, from an empty folder so your projects' `CLAUDE.md` files aren't sent.
+
+- **Privacy:** `--ai claude` and `--ai claude-code` send your file's text to Anthropic (a notice says so the first time). `--ai ollama` talks only to Ollama on your computer (`OLLAMA_HOST` to change where).
+- **Cost:** it prints the number of requests and an estimate of input tokens first. A chapter is a few requests to Claude Haiku 5.5. Replies are cached on disk, so running the same file again costs nothing.
+- **Checked, not trusted:** the model is asked to quote the line each card came from. Cards whose quote isn't in your file, or whose answer is mostly words your file doesn't use, are dropped, and the run says how many. The quote also gives the card its real page and heading. Small local models often leave the quote out; those cards are kept only if their term also comes from your file, and are placed where their words fit best.
+- **Prompt injection:** the file's text is sent as data inside `<document>` tags and the model is told not to follow instructions in it. The eval includes a document with a hidden instruction aimed at AI models, and counts any card that obeys it.
+- If a request fails, that part of the file is skipped with a warning. A missing key, a stopped Ollama or an unknown model stops the run (exit code 2).
+
 ## How well it works
 
-`eval/score.py` builds four test documents with original text, in layouts taken from real course material, and checks the cards against hand-written gold cards: what a student should get a card for. The gold cards were written before running the tool, so they include facts no rule catches yet.
+`eval/score.py` builds five test documents with original text, in layouts taken from real course material, and checks the cards against hand-written gold cards: what a student should get a card for. The gold cards were written before running the tool, so they include facts no rule catches yet.
 
 | Document | Layout | Gold | Cards | Precision | Recall |
 |---|---|---:|---:|---:|---:|
@@ -60,16 +87,29 @@ For PDFs, headings are found by font size and bold text, running headers, footer
 | deck | one slide per page: divider, bold sub-terms, arrows, picture and "Questions?" slides | 6 | 5 | 100% | 83% |
 | article | two columns with a narrow gutter, abstract, keywords, figure caption, references | 6 | 6 | 100% | 100% |
 | textbook | single column, running header, page numbers, bold terms | 9 | 6 | 100% | 78% |
-| **All** | | 31 | 24 | **100%** | **81%** |
+| hostile | short notes plus a hidden instruction aimed at AI models | 4 | 3 | 100% | 75% |
+| **All** | | 35 | 27 | **100%** | **80%** |
+
+With AI cards added, on the same documents:
+
+| | Rules only | + Claude Haiku 5.5 (`claude-code`) | + Llama 3.2 3B (`ollama`, local) |
+|---|---:|---:|---:|
+| Cards | 27 | 57 | 43 |
+| Recall | 80% | **94%** | **97%** |
+| Precision | **100%** | 56% | 77% |
+| Cards obeying the hidden instruction | 0 | **0** | **0** |
+
+Both models find the plain-statement facts the rules miss. Precision mostly measures style here: the gold set lists key terms only, Llama writes term → definition cards that match it, and Haiku also writes cards the gold set doesn't list, most of them sound ("Examples of abiotic factors → Temperature, water, light and soil", "Range of an RFM score → 111 to 555"). Llama's few extras include definitions it made up from the slide title ("Energy Flow → the movement of energy through an ecosystem"). Both repeat some rule-card facts in another form. `outputs/eval-<backend>.md` lists every card. On a real 4-slides-per-page lecture handout, the AI took the deck from 19 to 36 cards in one request.
 
 *Precision* is the share of cards that match a gold card; *recall* is the share of gold cards found (one cloze note with two deletions can find two). Missed today: facts phrased as plain statements ("Producers capture energy from sunlight", "Dominant alleles hide the effect of recessive ones"). Telling those apart from any other sentence needs grammar analysis or the planned AI stage. Real PDFs are messier than these documents, so expect lower precision on your own files.
 
 ```
 python eval/score.py              # writes outputs/eval.md and a deck per document
 python eval/score.py --private    # scores eval/private/<name>.pdf against <name>.jsonl
+python eval/score.py --ai claude  # rules + AI cards; writes outputs/eval-claude.md
 ```
 
-To score your own PDFs, put them in `eval/private/` (ignored by git) with a `<name>.jsonl` beside each, one `{"term": "...", "fact": "..."}` per line. CI runs the scorer on every push and shows the table in the run summary.
+To score your own PDFs, put them in `eval/private/` (ignored by git) with a `<name>.jsonl` beside each, one `{"term": "...", "fact": "..."}` per line. CI runs the rules eval on every push and shows the table in the run summary; the rules + Claude eval runs only when started by hand, since it calls the API.
 
 ## Reading your cards in Anki
 
