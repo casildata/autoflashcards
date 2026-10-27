@@ -119,7 +119,7 @@ To score your own PDFs, put them in `eval/private/` (ignored by git) with a `<na
 cells.md · Cell Biology › Transport
 ```
 
-That is the file, then the headings the line sat under. For PDFs it will also show the page (`p.12`), so you can check a card against your notes.
+That is the file, then the headings the line sat under. For PDFs it also shows the page (`notes.pdf · p.12 · Cells › Transport`), so you can check a card against your notes.
 
 **Tags.** Every card gets two kinds of tags. Anki shows `::` as a folder tree in the sidebar.
 
@@ -137,3 +137,7 @@ Useful searches in the Anki browser:
 | `tag:afg::rule::term_colon` | Cards from one rule, for example to review or bulk-delete them if that rule doesn't suit your notes |
 
 **Re-importing.** Each card is identified by its deck name and its front. If you fix your notes and import again, with Anki's default import settings existing cards are updated in place and your review history is kept, so you don't get duplicates. Changing a card's front, or the deck name, makes it a new card.
+
+## License
+
+MIT. Dependencies are under permissive licenses (MIT, BSD, Apache-2.0, ISC, PSF), except `frozendict` (LGPL-3.0), which `genanki` needs to write `.apkg` files. It is installed as a separate, unmodified package, so it doesn't change this project's license. CI fails if any other GPL-family package, or one that states no license, is added, runs `pip-audit` for known vulnerabilities and scans the history for committed secrets.

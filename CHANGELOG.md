@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- CI `dependencies` job: a license gate (`pip-licenses`, fails on GPL-family licenses and packages that state none; `frozendict`, LGPL-3.0 and required by `genanki`, is the one reviewed exception) and `pip-audit`, both run against a clean install of `.[ai]`. README: License section; the source line already shows PDF page numbers.
 - AI cards: `--ai claude` (Claude Haiku 5.5 by default, `anthropic` SDK structured output), `--ai claude-code` (runs `claude -p` on a Claude Pro/Max plan, no API key) or `--ai ollama` (local), with `--model`. Text goes in chunks of about 3,000 tokens; every card should quote its source line; cards whose quote, term or answer isn't in the document are dropped. One retry on a malformed reply, then the chunk is skipped with a warning; replies are cached on disk; requests and an input-token estimate are printed first. Install with `pip install ".[ai]"`.
 - Eval precision counts cards outside the gold set that were judged correct by hand (`eval/gold/<name>.judged.jsonl`); cards with no verdict yet are reported as *unjudged* and count against it. Before, every card the term-only gold set didn't list counted as wrong.
 - Eval with `--ai claude-code`: recall 80% → 94%, precision 100% → 86%, no card obeyed the hidden instruction.

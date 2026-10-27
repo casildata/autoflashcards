@@ -101,6 +101,40 @@ jobs:
           name: eval-ai
           path: outputs/
 
+  dependencies:
+    # what `pip install ".[ai]"` brings in, checked in its own environment so the
+    # checkers' own packages aren't counted
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install package in its own environment
+        run: |
+          python -m venv /tmp/deps
+          /tmp/deps/bin/python -m pip install --upgrade pip
+          /tmp/deps/bin/python -m pip install ".[ai]"
+
+      - name: Install checkers
+        run: pip install pip-licenses pip-audit
+
+      - name: License gate
+        # fails on any GPL-family license ("GPL" alone misses "GNU Affero General Public
+        # License") and on packages that state no license (pymupdf4llm, AGPL, is one).
+        # frozendict (LGPL-3.0) is required by genanki; it is installed as its own package,
+        # not bundled or changed, so it doesn't affect this project's MIT license
+        run: >-
+          pip-licenses --python /tmp/deps/bin/python --partial-match
+          --fail-on "GPL;General Public License;UNKNOWN" --ignore-packages frozendict
+
+      - name: Known vulnerabilities
+        env:
+          PIPAPI_PYTHON_LOCATION: /tmp/deps/bin/python
+        run: pip-audit --progress-spinner off
+
   secret-scan:
     runs-on: ubuntu-24.04
     steps:
