@@ -30,12 +30,27 @@ def test_markdown_to_apkg(tmp_path):
     assert out.stat().st_size > 0
 
 
+def test_pdf_to_apkg(cells_pdf, tmp_path):
+    out = tmp_path / "deck.apkg"
+    result = runner.invoke(app, [str(cells_pdf), "--out", str(out)])
+    assert result.exit_code == 0, result.output
+    assert "Wrote 7 cards" in result.output
+
+
 def test_unsupported_file_type(tmp_path):
+    doc = tmp_path / "notes.docx"
+    doc.write_bytes(b"PK")
+    result = runner.invoke(app, [str(doc)])
+    assert result.exit_code == 2
+    assert "unsupported file type" in result.output
+
+
+def test_damaged_pdf(tmp_path):
     pdf = tmp_path / "notes.pdf"
     pdf.write_bytes(b"%PDF-1.7")
     result = runner.invoke(app, [str(pdf)])
     assert result.exit_code == 2
-    assert "unsupported file type" in result.output
+    assert "can't read notes.pdf" in result.output
 
 
 def test_no_cards_exits_nonzero(tmp_path):

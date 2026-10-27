@@ -1,7 +1,20 @@
-"""Data passed between pipeline stages: readers make Blocks, rules make Cards."""
+"""Data passed between pipeline stages: readers make Lines or Blocks, rules make Cards."""
 
 from dataclasses import dataclass
 from typing import Literal
+
+
+@dataclass(frozen=True)
+class Line:
+    """One line of text as laid out on a page (PDF only; structure.py turns these into Blocks)."""
+
+    text: str
+    page: int  # 1-based
+    size: float  # font size in points
+    bold: bool  # every character is in a bold font
+    x0: float
+    top: float  # distance from the top of the page
+    bottom: float
 
 
 @dataclass(frozen=True)

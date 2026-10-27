@@ -4,10 +4,12 @@ from pathlib import Path
 
 from autoflashcards.models import Block
 from autoflashcards.readers.markdown import read_markdown
+from autoflashcards.readers.pdf import read_pdf
 
 READERS = {
     ".md": read_markdown,
     ".markdown": read_markdown,
+    ".pdf": read_pdf,
 }
 
 

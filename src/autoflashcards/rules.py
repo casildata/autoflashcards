@@ -9,7 +9,13 @@ from autoflashcards.models import Block, Card
 _TERM_COLON = re.compile(r"^(?P<term>[^:]{1,60}?)\s*:\s+(?P<definition>\S.*)$")
 _MAX_TERM_WORDS = 6
 # Labels that look like "Term:" but introduce a remark, not a definition
-_NOT_TERMS = {"note", "notes", "example", "examples", "e.g.", "tip", "warning", "see", "source"}
+_NOT_TERMS = {
+    "note", "notes", "example", "examples", "e.g.", "tip", "warning", "see", "source",
+    "keywords", "key words", "abstract",
+}  # fmt: skip
+_CAPTION = re.compile(r"^(fig(ure)?|table|chart|exhibit|eq(uation)?)\.?\s*\d", re.IGNORECASE)
+# Sections whose lines are citations, not facts
+_REFERENCE_HEADINGS = {"references", "bibliography", "works cited", "sources"}
 
 
 def term_colon(block: Block) -> list[Card]:
@@ -19,7 +25,7 @@ def term_colon(block: Block) -> list[Card]:
     if not match:
         return []
     term = match["term"].strip()
-    if len(term.split()) > _MAX_TERM_WORDS or term.lower() in _NOT_TERMS:
+    if len(term.split()) > _MAX_TERM_WORDS or term.lower() in _NOT_TERMS or _CAPTION.match(term):
         return []
     return [
         Card(
@@ -38,5 +44,15 @@ RULES: dict[str, Callable[[Block], list[Card]]] = {
 }
 
 
+def _in_references(block: Block) -> bool:
+    return any(h.lower() in _REFERENCE_HEADINGS for h in block.heading_path)
+
+
 def generate(blocks: list[Block]) -> list[Card]:
-    return [card for block in blocks for rule in RULES.values() for card in rule(block)]
+    return [
+        card
+        for block in blocks
+        if not _in_references(block)
+        for rule in RULES.values()
+        for card in rule(block)
+    ]

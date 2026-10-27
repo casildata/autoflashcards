@@ -6,7 +6,7 @@
 
 Turn PDFs, slides and notes into Anki-ready flashcard decks.
 
-**Status:** early development. Markdown input works today; PDF and PowerPoint are next.
+**Status:** early development. PDF and Markdown input work today; PowerPoint is next.
 
 ## Usage
 
@@ -14,13 +14,17 @@ From a clone of this repo:
 
 ```
 pip install .
-autoflashcards notes.md                       # writes notes.apkg
-autoflashcards week1.md week2.md --deck "Bio 101" --out bio.apkg
+autoflashcards lecture3.pdf                   # writes lecture3.apkg
+autoflashcards week1.md week2.pdf --deck "Bio 101" --out bio.apkg
 ```
 
 Then in Anki: **File → Import** and pick the `.apkg` file.
 
-Lines written as `Term: definition` become cards, with the term on the front and the definition on the back.
+Lines written as `Term: definition` become cards, with the term on the front and the definition on the back. Figure and table captions, labels such as `Note:` and reference lists are skipped.
+
+For PDFs, headings are found by font size and bold text, running headers, footers and page numbers are removed, and two-column pages are read left column first.
+
+**Not yet supported:** scanned PDFs (pages that are images, with no text layer) produce no cards; OCR is planned.
 
 ## Reading your cards in Anki
 

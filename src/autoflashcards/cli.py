@@ -21,7 +21,7 @@ def _print_version(value: bool) -> None:
 def main(
     inputs: Annotated[
         list[Path],
-        typer.Argument(exists=True, dir_okay=False, help="Markdown files."),
+        typer.Argument(exists=True, dir_okay=False, help="PDF or Markdown files."),
     ],
     out: Annotated[
         Path | None, typer.Option(help="Output .apkg (default: first input's name).")

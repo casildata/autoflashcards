@@ -1,7 +1,7 @@
 import pytest
 
 from autoflashcards.models import Block
-from autoflashcards.rules import term_colon
+from autoflashcards.rules import generate, term_colon
 
 
 def _card(text, kind="bullet"):
@@ -36,10 +36,22 @@ def test_card_keeps_source_and_rule():
         "The most important things to remember are these: a and b.",  # front too long
         "No colon here at all.",
         "Trailing colon:",
+        "Keywords: online retail; data mining",
+        "Figure 3: Project diagram.",
+        "Table 2: Variables in the dataset.",
+        "Fig. 4: Distribution by cluster.",
     ],
 )
 def test_not_a_definition(text):
     assert _card(text) is None
+
+
+def test_reference_sections_are_skipped():
+    blocks = [
+        Block("paragraph", "Osmosis: water.", "x.pdf", ("Ch1",)),
+        Block("paragraph", "Hoboken, NJ: John Wiley & Sons.", "x.pdf", ("Ch1", "References")),
+    ]
+    assert [c.front for c in generate(blocks)] == ["Osmosis"]
 
 
 def test_headings_are_skipped():
