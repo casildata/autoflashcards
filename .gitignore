@@ -1,0 +1,23 @@
+# Generated outputs (re-created by run_all.py)
+outputs/*
+!outputs/.gitkeep
+
+# AI response cache
+.cache/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+desktop.ini
+~$*
+
+# Plan Notes
+docs/PLAN.md
