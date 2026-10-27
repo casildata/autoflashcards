@@ -28,8 +28,21 @@ def test_markdown_to_apkg(tmp_path):
     assert result.exit_code == 0, result.output
     # 7 term_colon, 1 bold_lead, 2 definition_sentence; the second "Osmosis" is dropped
     assert "Wrote 10 cards" in result.output
-    assert "1 dropped" in result.output
+    assert (
+        "Dropped 1 card(s): 1 same front as an earlier card; run with --json to review them"
+        in result.output
+    )
     assert out.stat().st_size > 0
+
+
+def test_dropped_summary_points_to_the_json(tmp_path):
+    out = tmp_path / "deck.apkg"
+    result = runner.invoke(app, [str(FIXTURE), "--out", str(out), "--json"])
+    assert result.exit_code == 0, result.output
+    assert (
+        f"Dropped 1 card(s): 1 same front as an earlier card; listed in {out.with_suffix('.json')}"
+        in result.output
+    )
 
 
 def test_pdf_to_apkg(cells_pdf, tmp_path):

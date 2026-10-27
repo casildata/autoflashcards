@@ -1,5 +1,6 @@
 """Command-line entry point: `autoflashcards INPUT...`."""
 
+from collections import Counter
 from pathlib import Path
 from typing import Annotated
 
@@ -56,6 +57,13 @@ def _ai_cards(blocks: list[Block], backend: str, model: str | None) -> list[Card
     except ai.AIUnavailable as err:
         typer.echo(f"Error: {err}", err=True)
         raise typer.Exit(code=2) from err
+
+
+def _dropped_summary(removed: list[tuple[Card, str]], json_path: Path | None) -> str:
+    counts = Counter(reason for _, reason in removed)
+    reasons = ", ".join(f"{n} {reason}" for reason, n in counts.most_common())
+    where = f"listed in {json_path}" if json_path else "run with --json to review them"
+    return f"Dropped {len(removed)} card(s): {reasons}; {where}"
 
 
 @app.command()
@@ -128,13 +136,14 @@ def main(
     if json:  # written even when there are no cards: that's when it's most useful
         write_json(blocks, cards, removed, out.with_suffix(".json"))
         typer.echo(f"Wrote {len(blocks)} blocks to {out.with_suffix('.json')}")
+    if removed:
+        typer.echo(_dropped_summary(removed, out.with_suffix(".json") if json else None))
     if not cards:
         typer.echo("No cards found; no deck written.", err=True)
         raise typer.Exit(code=1)
 
     write_apkg(cards, deck_name, out)
-    dropped = f" ({len(removed)} dropped as duplicates or too long)" if removed else ""
-    typer.echo(f"Wrote {len(cards)} cards to {out}{dropped}")
+    typer.echo(f"Wrote {len(cards)} cards to {out}")
     if csv:
         write_csv(cards, deck_name, out.with_suffix(".csv"))
         typer.echo(f"Wrote {len(cards)} cards to {out.with_suffix('.csv')}")

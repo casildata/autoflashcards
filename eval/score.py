@@ -256,6 +256,8 @@ def main() -> int:
     text = report(scores, title)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(text, encoding="utf-8")
+    # the report has "→"; Windows pipes and redirects default to cp1252, which can't encode it
+    sys.stdout.reconfigure(encoding="utf-8")
     print(text)
     # a crash or no cards at all fails CI; low scores are reported, not failed
     return 0 if sum(s.cards for s in scores) else 1
