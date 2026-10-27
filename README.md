@@ -6,4 +6,45 @@
 
 Turn PDFs, slides and notes into Anki-ready flashcard decks.
 
-**Status:** in development; nothing to run yet.
+**Status:** early development. Markdown input works today; PDF and PowerPoint are next.
+
+## Usage
+
+From a clone of this repo:
+
+```
+pip install .
+autoflashcards notes.md                       # writes notes.apkg
+autoflashcards week1.md week2.md --deck "Bio 101" --out bio.apkg
+```
+
+Then in Anki: **File → Import** and pick the `.apkg` file.
+
+Lines written as `Term: definition` become cards, with the term on the front and the definition on the back.
+
+## Reading your cards in Anki
+
+**The source line.** Under each answer, a small grey line shows where the card came from:
+
+```
+cells.md · Cell Biology › Transport
+```
+
+That is the file, then the headings the line sat under. For PDFs it will also show the page (`p.12`), so you can check a card against your notes.
+
+**Tags.** Every card gets two kinds of tags. Anki shows `::` as a folder tree in the sidebar.
+
+| Tag | Example | Meaning |
+|---|---|---|
+| Headings | `cell_biology::transport` | The headings the card came from, lowercased with spaces turned into `_`. Click a folder in the sidebar to study one chapter or section. |
+| Rule | `afg::rule::term_colon` | Which autoflashcards rule made the card (`afg` = autoflashcards). `term_colon` means it came from a `Term: definition` line. |
+
+Useful searches in the Anki browser:
+
+| Search | Finds |
+|---|---|
+| `tag:cell_biology::transport` | Cards from the Transport section, including its subsections |
+| `tag:afg::*` | Every card autoflashcards made |
+| `tag:afg::rule::term_colon` | Cards from one rule, for example to review or bulk-delete them if that rule doesn't suit your notes |
+
+**Re-importing.** Each card is identified by its deck name and its front. If you fix your notes and import again, with Anki's default import settings existing cards are updated in place and your review history is kept, so you don't get duplicates. Changing a card's front, or the deck name, makes it a new card.
