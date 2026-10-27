@@ -15,6 +15,9 @@ MIN_SPLIT_SHARE = 0.25  # share of a page's lines that must split for it to coun
 # A gap wider than this share of the font size is a word space. pdfplumber's default (a fixed
 # 3pt) runs words together in small fonts and splits words in some typeset PDFs
 WORD_GAP_RATIO = 0.15
+# Letter boxes overlapping by more than this share of the font size, typically, mean the
+# PDF's glyph widths are wrong (common in PowerPoint exports), so gaps can't find spaces
+OVERLAP_RATIO = 0.1
 UNMAPPED = "�"  # stands in for glyphs the PDF doesn't map to text, shown as "(cid:N)"
 
 
@@ -79,8 +82,15 @@ def _top(chars: list[dict]) -> float:
 
 
 def _text(chars: list[dict]) -> str:
+    """Line text. Spaces come from the gaps between letters, unless the letter boxes overlap
+    too much to measure gaps; then the PDF's own space characters are used. (Gaps are the
+    default because some typeset PDFs put stray space characters inside words.)"""
     chars = [{**c, "text": UNMAPPED} if c["text"].startswith("(cid:") else c for c in chars]
-    return extract_text(chars, x_tolerance_ratio=WORD_GAP_RATIO)
+    visible = sorted(_visible(chars), key=lambda c: c["x0"])
+    steps = [b["x0"] - a["x1"] for a, b in zip(visible, visible[1:], strict=False)]
+    if steps and median(steps) < -OVERLAP_RATIO * visible[0]["size"]:
+        return extract_text(chars, keep_blank_chars=True)
+    return extract_text(visible, x_tolerance_ratio=WORD_GAP_RATIO)
 
 
 def _bold_lead(chars: list[dict]) -> str:
@@ -102,7 +112,7 @@ def read_lines(path: Path) -> list[Line]:
                 # dedupe: some PDFs print a glyph twice in the same spot (fake bold, ligatures)
                 raw_lines = [
                     _unique(r["chars"])
-                    for r in page.dedupe_chars().extract_text_lines()
+                    for r in page.dedupe_chars().extract_text_lines(keep_blank_chars=True)
                     if _visible(r["chars"])
                 ]
                 for chars in _in_reading_order(raw_lines, page.width):

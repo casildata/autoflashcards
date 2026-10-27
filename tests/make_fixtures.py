@@ -5,7 +5,7 @@ The text is original, so no third-party documents are committed.
 
 from pathlib import Path
 
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import landscape, letter
 from reportlab.pdfgen.canvas import Canvas
 
 BODY, REGULAR, BOLD = 10.5, "Helvetica", "Helvetica-Bold"
@@ -121,7 +121,70 @@ def build_two_column_pdf(path: Path) -> Path:
     return path
 
 
+# A lecture deck exported to PDF: one list per slide. Kinds: divider (40pt section slide),
+# title (28pt bold), bullet (18pt), bold_bullet (18pt bold), sub (16pt, indented), caption
+SLIDES = [
+    [("divider", "43.1"), ("divider", "Innate Immunity")],
+    [
+        ("title", "Phagocytes"),
+        ("bullet", "White blood cells that engulf pathogens"),
+        ("bullet", "Include neutrophils and macrophages"),
+        ("bullet", "Found in blood and in body tissues"),
+        ("bullet", "Part of the first response to infection"),
+    ],
+    [
+        ("title", "Phagocyte Types"),
+        ("bold_bullet", "Macrophages"),
+        ("sub", "Large phagocytes that live in tissues"),
+        ("sub", "Present antigens to T cells"),
+        ("bold_bullet", "Neutrophils"),
+        ("sub", "Most abundant white blood cells"),
+    ],
+    [
+        ("title", "Chemical Signals"),
+        # "->", not "→": the built-in Helvetica can't encode the arrow (rules tests cover it)
+        ("bullet", "Cytokines -> signal molecules that recruit immune cells"),
+        ("bullet", "Interferons = proteins that interfere with viral replication"),
+    ],
+    [("title", "Image of a macrophage engulfing bacteria"), ("caption", "Macrophage at work")],
+    [("title", "Thanks!"), ("bullet", "Template credits: made with a free slide template")],
+]
+
+
+def build_slides_pdf(path: Path) -> Path:
+    width, height = landscape(letter)
+    canvas = Canvas(str(path), pagesize=(width, height))
+    for slide in SLIDES:
+        y = height - 80
+        for kind, text in slide:
+            if kind == "divider":
+                canvas.setFont(BOLD, 40)
+                canvas.drawString(LEFT, y, text)
+                y -= 60
+            elif kind == "title":
+                canvas.setFont(BOLD, 28)
+                canvas.drawString(LEFT, y, text)
+                y -= 50
+            elif kind == "caption":
+                canvas.setFont(REGULAR, 14)
+                canvas.drawString(LEFT, y, text)
+                y -= 24
+            else:
+                bold = kind == "bold_bullet"
+                size = 16 if kind == "sub" else 18
+                x = LEFT + 30 if kind == "sub" else LEFT
+                canvas.setFont(REGULAR, size)
+                canvas.drawString(x, y, "–" if kind == "sub" else "•")
+                canvas.setFont(BOLD if bold else REGULAR, size)
+                canvas.drawString(x + 20, y, text)
+                y -= 30
+        canvas.showPage()
+    canvas.save()
+    return path
+
+
 if __name__ == "__main__":
     out = Path(__file__).parent / "fixtures"
     print(build_cells_pdf(out / "cells.pdf"))
     print(build_two_column_pdf(out / "two_column.pdf"))
+    print(build_slides_pdf(out / "slides.pdf"))

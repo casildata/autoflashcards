@@ -47,6 +47,13 @@ def test_fields_tags_and_models(tmp_path):
     assert t3 == ["afg::rule::definition_sentence"]
 
 
+def test_bullet_backs_show_one_bullet_per_line(tmp_path):
+    card = Card("Protein kinases", "Add phosphates\nWork in <cascades>", "bold_term_bullets", "x")
+    write_apkg([card], "Bio", tmp_path / "deck.apkg")
+    ((_, _, fields, _),) = _notes(tmp_path / "deck.apkg", tmp_path)
+    assert fields[1] == "Add phosphates<br>Work in &lt;cascades&gt;"
+
+
 def test_ids_are_stable_across_runs_and_back_edits(tmp_path):
     write_apkg(CARDS, "Bio", tmp_path / "a.apkg")
     edited = [replace(CARDS[0], back="fixed typo"), *CARDS[1:]]

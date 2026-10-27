@@ -1,6 +1,9 @@
 import pytest
 
+from autoflashcards.dedupe import dedupe
 from autoflashcards.readers import read
+from autoflashcards.readers.pdf import _text
+from autoflashcards.rules import generate
 
 T, CB, MP, ORG = "Transport", "Cell Biology", "Membrane Proteins", "Organelles"
 
@@ -47,6 +50,54 @@ def test_two_columns_are_read_left_column_first(two_column_pdf):
         ("paragraph", "Active site: the region where the substrate binds."),
         ("paragraph", "Inhibitor: a molecule that slows an enzyme down."),
     ]
+
+
+def test_slide_deck_cards(slides_pdf):
+    cards, _ = dedupe(generate(read(slides_pdf)))
+    assert [(c.rule, c.front, c.back.split("\n")) for c in cards] == [
+        (
+            "slide_title_bullets",
+            "Phagocytes",
+            [  # first 3 of the slide's 4 bullets
+                "White blood cells that engulf pathogens",
+                "Include neutrophils and macrophages",
+                "Found in blood and in body tissues",
+            ],
+        ),
+        (
+            "bold_term_bullets",
+            "Macrophages",
+            ["Large phagocytes that live in tissues", "Present antigens to T cells"],
+        ),
+        ("bold_term_bullets", "Neutrophils", ["Most abundant white blood cells"]),
+        ("term_colon", "Cytokines", ["signal molecules that recruit immune cells"]),
+        ("term_colon", "Interferons", ["proteins that interfere with viral replication"]),
+    ]  # no cards from the "43.1" divider, the "Image of…" slide or the "Thanks!" slide
+
+
+def test_section_numbers_are_not_headings(slides_pdf):
+    blocks = read(slides_pdf)
+    assert "43.1" not in [b.text for b in blocks if b.kind == "heading"]
+    assert all("43.1" not in b.heading_path for b in blocks)
+
+
+def _char(text, x0, x1, size=14.0):
+    return {
+        "text": text, "x0": x0, "x1": x1, "top": 100.0, "bottom": 100 + size, "doctop": 100.0,
+        "size": size, "fontname": "Calibri", "upright": True, "width": x1 - x0, "height": size,
+    }  # fmt: skip
+
+
+def test_spaces_from_gaps_when_letter_boxes_are_accurate():
+    # a stray space character inside "fi nancial", as in some typeset PDFs, is ignored
+    chars = [_char("ﬁ", 0, 6), _char(" ", 3, 6), _char("n", 6, 12), _char("e", 18, 24)]
+    assert _text(chars) == "fin e"  # pdfplumber also expands the ligature
+
+
+def test_space_characters_used_when_letter_boxes_overlap():
+    # PowerPoint exports: each box is wider than the letter's advance, so gaps are negative
+    chars = [_char("o", 0, 13), _char("f", 8, 18), _char(" ", 14, 22), _char("t", 20, 30)]
+    assert _text(chars) == "of t"
 
 
 def test_damaged_pdf_is_a_clear_error(tmp_path):

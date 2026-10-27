@@ -34,17 +34,21 @@ Each paragraph or bullet is checked against these rules in order; the first one 
 
 | Rule | Your notes say | Card |
 |---|---|---|
-| `term_colon` | `Osmosis: movement of water across a membrane.` | **Osmosis** → movement of water across a membrane. |
+| `term_colon` | `Osmosis: movement of water across a membrane.` (or `=`, `→`, `->`) | **Osmosis** → movement of water across a membrane. |
 | `bold_lead` | **Mitosis** divides a cell into two identical cells. | **Mitosis** → divides a cell into two identical cells. |
 | `definition_sentence` | A ribosome is a structure that builds proteins. | Cloze: A [...] is a structure that builds proteins. |
+| `bold_term_bullets` | • **Protein kinases**<br>&nbsp;&nbsp;– Transfer phosphates from ATP to proteins | **Protein kinases** → Transfer phosphates from ATP to proteins |
+| `slide_title_bullets` | Slide title *G protein-coupled receptor*, then its bullets | **G protein-coupled receptor** → its first three bullets |
 
 `definition_sentence` looks for "X is a / are the / was an / is defined as / is called / is known as / refers to …", and skips sentences whose subject is a pronoun ("It is a…", "There are…").
 
-Skipped everywhere: figure and table captions, labels such as `Note:` or `Keywords:`, and anything under a References or Bibliography heading. Cards with the same front, near-identical cards (90% similar or more) and overly long cards are dropped; `--json` lists them.
+The last two rules are for lecture slides, including slides exported to PDF. A card's back holds up to three bullets, one per line. `slide_title_bullets` only uses short sections made entirely of bullets (up to 8), so the headings of a textbook or article don't turn into list cards. It also skips titles that describe a picture ("Image of…", "Example of…", "Illustration of…") and slides whose bullets are already `Term: definition` cards.
+
+Skipped everywhere: figure and table captions, labels such as `Note:` or `Keywords:`, and sections headed References, Bibliography, Table of contents, Thanks or Credits. Cards with the same front, near-identical cards (90% similar or more) and overly long cards are dropped; `--json` lists them.
 
 For PDFs, headings are found by font size and bold text, running headers, footers and page numbers are removed, and two-column pages are read left column first.
 
-**Not yet supported:** scanned PDFs (pages that are images, with no text layer) produce no cards; OCR is planned.
+**Not yet supported:** scanned PDFs (pages that are images, with no text layer) produce no cards; OCR is planned. In PDFs, sub-bullets aren't told apart from bullets, so a bold term's back is "the bullets after it, up to the next bold term or slide".
 
 ## Reading your cards in Anki
 
@@ -61,7 +65,7 @@ That is the file, then the headings the line sat under. For PDFs it will also sh
 | Tag | Example | Meaning |
 |---|---|---|
 | Headings | `cell_biology::transport` | The headings the card came from, lowercased with spaces turned into `_`. Click a folder in the sidebar to study one chapter or section. |
-| Rule | `afg::rule::term_colon` | Which autoflashcards rule made the card (`afg` = autoflashcards): `term_colon`, `bold_lead` or `definition_sentence`, as in the table above. |
+| Rule | `afg::rule::term_colon` | Which autoflashcards rule made the card (`afg` = autoflashcards), named as in the table above. |
 
 Useful searches in the Anki browser:
 

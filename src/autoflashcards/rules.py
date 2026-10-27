@@ -1,7 +1,8 @@
-"""Heuristic card rules. Each rule maps one Block to zero or more Cards.
+"""Heuristic card rules.
 
-Rules are tried in the order of RULES; the first one that makes cards from a block wins,
-so one fact doesn't become two cards.
+Each rule looks at one block, `blocks[i]`, and may read the blocks after it (a slide title's
+bullets, a bold term's sub-bullets). Rules are tried in the order of RULES; the first one
+that makes cards from a block wins, so one fact doesn't become two cards.
 """
 
 import re
@@ -9,8 +10,11 @@ from collections.abc import Callable
 
 from autoflashcards.models import Block, Card
 
-# "Term: definition" with a short term and a space after the colon (skips URLs and times)
-_TERM_COLON = re.compile(r"^(?P<term>[^:]{1,60}?)\s*:\s+(?P<definition>\S.*)$")
+# "Term: definition", also with "=", "→" or "->" as on slides. A colon needs a space after
+# it, which skips URLs and times
+_TERM_SEPARATOR = re.compile(
+    r"^(?P<term>[^:=→]{1,60}?)\s*(?::\s+|=\s*|→\s*|->\s*)(?P<definition>\S.*)$"
+)
 _MAX_TERM_WORDS = 6
 # Labels that look like "Term:" but introduce a remark, not a definition
 _NOT_TERMS = {
@@ -18,8 +22,17 @@ _NOT_TERMS = {
     "keywords", "key words", "abstract",
 }  # fmt: skip
 _CAPTION = re.compile(r"^(fig(ure)?|table|chart|exhibit|eq(uation)?)\.?\s*\d", re.IGNORECASE)
-# Sections whose lines are citations, not facts
-_REFERENCE_HEADINGS = {"references", "bibliography", "works cited", "sources"}
+# Sections with no facts to learn: citations, slide-deck front and back matter
+_SKIP_SECTIONS = {
+    "references", "bibliography", "works cited", "sources", "table of contents", "contents",
+    "thanks", "thank you", "questions", "credits", "acknowledgements", "acknowledgments",
+}  # fmt: skip
+# Slide titles that describe a picture rather than name a term
+_PICTURE_TITLE = re.compile(
+    r"^(image|illustration|example|diagram|figure|photo|picture|video)s?\b", re.IGNORECASE
+)
+MAX_SECTION_BULLETS = 8  # a slide's worth; longer bullet lists are textbook lists, not slides
+MAX_BACK_BULLETS = 3
 
 # "X is a / are the / was an / is defined as / is called / refers to Y". Not "means": too
 # often a plain verb or a name ("proc means")
@@ -47,17 +60,26 @@ def _card(block: Block, front: str, back: str, rule: str, kind: str = "basic") -
 def _is_term(term: str) -> bool:
     return (
         any(ch.isalpha() for ch in term)  # not a bare number such as a bold page number
+        and not re.fullmatch(r"\d+s", term)  # nor a decade ("1970s")
         and len(term.split()) <= _MAX_TERM_WORDS
         and term.lower() not in _NOT_TERMS
         and not _CAPTION.match(term)
     )
 
 
+def _is_skipped_section(heading: str) -> bool:
+    return re.sub(r"[^\w\s]", "", heading.lower()).strip() in _SKIP_SECTIONS
+
+
+def _all_bold(block: Block) -> bool:
+    return bool(block.bold_lead) and block.bold_lead == block.text
+
+
 def term_colon(block: Block) -> list[Card]:
-    """`Osmosis: movement of water…` → Osmosis / movement of water…"""
+    """`Osmosis: movement of water…` (or `=`, `→`) → Osmosis / movement of water…"""
     if block.kind == "heading":
         return []
-    match = _TERM_COLON.match(block.text)
+    match = _TERM_SEPARATOR.match(block.text)
     if not match or not _is_term(term := match["term"].strip()):
         return []
     return [_card(block, term, match["definition"].strip(), "term_colon")]
@@ -66,13 +88,13 @@ def term_colon(block: Block) -> list[Card]:
 def bold_lead(block: Block) -> list[Card]:
     """`**Mitosis** divides a cell into two…` → Mitosis / divides a cell into two…"""
     lead = block.bold_lead
-    if block.kind == "heading" or not lead or lead == block.text:
+    if block.kind == "heading" or not lead or _all_bold(block):
         return []
     rest = block.text[len(lead) :].strip()
     if rest.startswith(":"):  # "**Term**: definition" is term_colon's
         return []
     term = lead.rstrip(" :-–—,.")
-    rest = rest.lstrip(" -–—,.")
+    rest = rest.lstrip(" -–—,.=→>")
     if not _is_term(term) or len(rest.split()) < 3:
         return []
     return [_card(block, term, rest, "bold_lead")]
@@ -96,26 +118,92 @@ def definition_sentence(block: Block) -> list[Card]:
     return cards
 
 
-RULES: dict[str, Callable[[Block], list[Card]]] = {
-    "term_colon": term_colon,
-    "bold_lead": bold_lead,
-    "definition_sentence": definition_sentence,
+def bold_term_bullets(blocks: list[Block], i: int) -> list[Card]:
+    """An all-bold bullet followed by plain bullets that explain it:
+
+    • **Protein kinases**
+        • Transfer phosphates from ATP to proteins
+    → Protein kinases / Transfer phosphates from ATP to proteins
+    """
+    term = blocks[i]
+    if term.kind != "bullet" or not _all_bold(term) or not _is_term(term.text):
+        return []
+    explained = []
+    for block in blocks[i + 1 :]:
+        same_place = (block.heading_path, block.page) == (term.heading_path, term.page)
+        if block.kind != "bullet" or _all_bold(block) or not same_place:
+            break
+        explained.append(block.text)
+    if not explained:
+        return []
+    return [_card(term, term.text, "\n".join(explained[:MAX_BACK_BULLETS]), "bold_term_bullets")]
+
+
+def slide_title_bullets(blocks: list[Block], i: int) -> list[Card]:
+    """A slide whose title is a term and whose bullets explain it:
+
+    G protein-coupled receptor (GPCR)
+      • Cell-surface receptors that work with a G protein
+    → G protein-coupled receptor (GPCR) / Cell-surface receptors that work with a G protein
+
+    Only short, all-bullet sections count, so textbook headings don't become list cards.
+    """
+    title = blocks[i]
+    if (
+        title.kind != "heading"
+        or not _is_term(title.text)
+        or _PICTURE_TITLE.match(title.text)
+        or _is_skipped_section(title.text)
+    ):
+        return []
+    section = []
+    for block in blocks[i + 1 :]:
+        if block.kind == "heading":
+            break
+        section.append(block)
+    if (
+        not section
+        or len(section) > MAX_SECTION_BULLETS
+        or any(b.kind != "bullet" for b in section)
+        or _all_bold(section[0])  # sub-terms under the title: bold_term_bullets' job
+        # labeled items ("Osmosis: …") are cards already; the title is just their category
+        or any(term_colon(b) for b in section)
+    ):
+        return []
+    back = "\n".join(b.text for b in section[:MAX_BACK_BULLETS])
+    return [_card(section[0], title.text, back, "slide_title_bullets")]
+
+
+Rule = Callable[[list[Block], int], list[Card]]
+
+
+def _one_block(rule: Callable[[Block], list[Card]]) -> Rule:
+    return lambda blocks, i: rule(blocks[i])
+
+
+RULES: dict[str, Rule] = {
+    "term_colon": _one_block(term_colon),
+    "bold_lead": _one_block(bold_lead),
+    "definition_sentence": _one_block(definition_sentence),
+    "bold_term_bullets": bold_term_bullets,
+    "slide_title_bullets": slide_title_bullets,
 }
 
 
-def _in_references(block: Block) -> bool:
-    return any(h.lower() in _REFERENCE_HEADINGS for h in block.heading_path)
+def _skipped(block: Block) -> bool:
+    # only the nearest heading: one misread heading mustn't hide the rest of a document
+    return bool(block.heading_path) and _is_skipped_section(block.heading_path[-1])
 
 
 def generate(blocks: list[Block], rule_names: list[str] | None = None) -> list[Card]:
     """Cards from every block, using the named rules (default: all) in RULES order."""
     rules = [rule for name, rule in RULES.items() if rule_names is None or name in rule_names]
     cards = []
-    for block in blocks:
-        if _in_references(block):
+    for i, block in enumerate(blocks):
+        if _skipped(block):
             continue
         for rule in rules:
-            if made := rule(block):
+            if made := rule(blocks, i):
                 cards += made
                 break
     return cards

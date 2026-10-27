@@ -72,6 +72,8 @@ def _body_size(lines: list[Line]) -> float:
 
 
 def _is_heading(line: Line, body: float) -> bool:
+    if not any(ch.isalpha() for ch in line.text):
+        return False  # section numbers on divider slides ("11.2", "01")
     words = len(line.text.split())
     if line.size >= body * HEADING_SIZE_RATIO:
         return words <= MAX_HEADING_WORDS

@@ -65,6 +65,11 @@ def _tag(text: str) -> str:
     return re.sub(r"[^\w-]+", "_", text.lower()).strip("_")
 
 
+def _html(text: str) -> str:
+    """Anki fields are HTML: escape the text, and show line breaks (one per bullet)."""
+    return html.escape(text).replace("\n", "<br>")
+
+
 def tags(card: Card) -> list[str]:
     result = [f"afg::rule::{card.rule}"]
     heading_tag = "::".join(t for t in map(_tag, card.heading_path) if t)
@@ -82,7 +87,7 @@ def to_note(deck_name: str, card: Card) -> genanki.Note:
     model = CLOZE_MODEL if card.kind == "cloze" else BASIC_MODEL
     return genanki.Note(
         model=model,
-        fields=[html.escape(card.front), html.escape(card.back), html.escape(card.source_label)],
+        fields=[_html(card.front), _html(card.back), _html(card.source_label)],
         tags=tags(card),
         guid=note_guid(deck_name, card),
     )
@@ -112,14 +117,14 @@ def write_csv(cards: list[Card], deck_name: str, out: Path) -> None:
         f.write(_CSV_HEADER)
         writer = csv.writer(f, delimiter="\t", lineterminator="\n")
         for card in cards:
-            source = f"<br><small>{html.escape(card.source_label)}</small>"
+            source = f"<br><small>{_html(card.source_label)}</small>"
             notetype = "Cloze" if card.kind == "cloze" else "Basic"
             writer.writerow([
                 note_guid(deck_name, card),
                 notetype,
                 deck_name,
-                html.escape(card.front),
-                html.escape(card.back) + source,
+                _html(card.front),
+                _html(card.back) + source,
                 " ".join(tags(card)),
             ])  # fmt: skip
 

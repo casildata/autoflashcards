@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Slide rules: `bold_term_bullets` (an all-bold bullet and the bullets that explain it) and `slide_title_bullets` (a slide title and its bullets, for short all-bullet sections only). Rules now see the blocks after the one they start from.
+- `term_colon` also accepts `=`, `→` and `->` as separators; decades ("1970s") aren't terms.
+- Card backs with several bullets show one per line in Anki.
+- Sections headed Table of contents, Thanks, Questions or Credits are skipped, judged by the nearest heading only. Number-only lines ("11.2" on divider slides) are no longer headings.
+- PDF text: when letter boxes overlap (PowerPoint exports have wrong glyph widths), the PDF's own space characters are used instead of gap measurement, which fixes run-together words in exported slides.
+
 - New rules: `bold_lead` (a bold term followed by text) and `definition_sentence` ("X is a…", "X refers to…" sentences become cloze cards). Rules run in order and the first match per block wins. `--rules` picks a subset.
 - Filter stage: cards with the same front, near-duplicates (rapidfuzz ratio ≥ 90) and overly long or empty cards are dropped, with a reason.
 - `--csv` writes an Anki text-import file with file headers (built-in Basic and Cloze note types, same note IDs as the `.apkg`). `--json` writes blocks, cards and dropped cards.
