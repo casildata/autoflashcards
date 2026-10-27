@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `definition_sentence`: "X means Y" (before a noun phrase or "-ing" word), one cloze deletion per defining clause ("X means A, and Y means B" → c1, c2), and appositives ("Retention, the share of customers who return, is…"). Fixed: the sentence-start capital check was case-insensitive, so lowercase fragments could become cards. Eval recall 71% → 81%, precision unchanged at 100%; no change on the real PDFs checked.
+- `eval/score.py` counts each cloze deletion as a question, and each question claims only its closest gold card.
+
 - Evaluation: `eval/score.py` scores the rules against hand-written gold cards for four generated documents (handout, slide deck, two-column article, textbook) and writes `outputs/eval.md`; `--private` scores your own PDFs in the git-ignored `eval/private/`. Baseline: 100% precision, 71% recall over 31 gold cards. CI's new `e2e` job runs it on every push.
 
 - PDF slide handouts (several slides per page): page layout is split into text boxes by recursive XY-cut, so slides are read one at a time and two-column articles with narrow gutters are read column by column. Lines that stop short of their box's edge end an item even without a period, and a `Term = …` line always starts a new one.

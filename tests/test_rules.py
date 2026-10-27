@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from autoflashcards.models import Block
@@ -119,10 +121,16 @@ def _cloze(text):
         "The {{c1::cell membrane}} is defined as a lipid barrier.",
         "{{c1::Entropy}} refers to the disorder of a system.",
         "{{c1::Napoleon}} was a French military leader.",
+        "{{c1::Homozygous}} means having two identical alleles.",
+        "{{c1::Homozygous}} means having two identical alleles, and {{c2::heterozygous}} means "
+        "having two different ones.",
+        "A {{c1::cation}} is an ion with a positive charge; an {{c2::anion}} is an ion with a "
+        "negative charge.",
+        "{{c1::Retention}}, the share of customers who come back, is easy to explain.",
     ],
 )
 def test_definition_becomes_cloze(cloze):
-    text = cloze.replace("{{c1::", "").replace("}}", "")
+    text = re.sub(r"\{\{c\d::(.+?)\}\}", r"\1", cloze)
     assert _cloze(text) == [cloze]
 
 
@@ -137,6 +145,11 @@ def test_definition_becomes_cloze(cloze):
         "The SAS procedures proc means and proc sql were used.",  # "means" isn't a cue
         "In biology, a cell is a unit of life.",  # comma before the verb
         "Osmosis is a process.",  # too little after the verb
+        "evidence is a strong word here.",  # lowercase start: a fragment
+        "Proc means and proc sql were used.",  # "means" before "and" isn't a definition
+        "However, the results, as shown below, are mixed.",  # not an appositive term
+        "In 2010, a small study, run by one shop, found more.",
+        "Cells divide, and it is a slow process.",  # pronoun subject in the second clause
     ],
 )
 def test_not_a_definition_sentence(text):

@@ -40,7 +40,7 @@ Each paragraph or bullet is checked against these rules in order; the first one 
 | `bold_term_bullets` | • **Protein kinases**<br>&nbsp;&nbsp;– Transfer phosphates from ATP to proteins | **Protein kinases** → Transfer phosphates from ATP to proteins |
 | `slide_title_bullets` | Slide title *G protein-coupled receptor*, then its bullets | **G protein-coupled receptor** → its first three bullets |
 
-`definition_sentence` looks for "X is a / are the / was an / is defined as / is called / is known as / refers to …", and skips sentences whose subject is a pronoun ("It is a…", "There are…").
+`definition_sentence` looks for "X is a / are the / was an / is defined as / is called / is known as / refers to / means …" at the start of a sentence, and skips sentences whose subject is a pronoun ("It is a…", "There are…"). A sentence that defines two terms ("Homozygous means having two identical alleles, and heterozygous means…") becomes one cloze note with two deletions, so Anki quizzes each. It also catches a term followed by its description between commas: "{{c1::Retention}}, the share of customers who come back, is…".
 
 The last two rules are for lecture slides, including slides exported to PDF. A card's back holds up to three bullets, one per line. `slide_title_bullets` only uses short sections made entirely of bullets (up to 8) on the slide's own page, so the headings of a textbook or article don't turn into list cards. It also skips titles that describe a picture ("Image of…", "Example of…", "Illustration of…") and slides whose bullets are already `Term: definition` cards.
 
@@ -58,11 +58,11 @@ For PDFs, headings are found by font size and bold text, running headers, footer
 |---|---|---:|---:|---:|---:|
 | handout | 4 slides per page, bullets drawn as pictures, a notes column, a chart slide | 10 | 7 | 100% | 70% |
 | deck | one slide per page: divider, bold sub-terms, arrows, picture and "Questions?" slides | 6 | 5 | 100% | 83% |
-| article | two columns with a narrow gutter, abstract, keywords, figure caption, references | 6 | 5 | 100% | 83% |
-| textbook | single column, running header, page numbers, bold terms | 9 | 5 | 100% | 56% |
-| **All** | | 31 | 22 | **100%** | **71%** |
+| article | two columns with a narrow gutter, abstract, keywords, figure caption, references | 6 | 6 | 100% | 100% |
+| textbook | single column, running header, page numbers, bold terms | 9 | 6 | 100% | 78% |
+| **All** | | 31 | 24 | **100%** | **81%** |
 
-*Precision* is the share of cards that match a gold card; *recall* is the share of gold cards found. Missed today: definitions phrased as plain statements ("Producers capture energy from sunlight"), "X means Y", definitions set off by commas ("Retention, the share of customers who…"), and two terms defined in one sentence. Real PDFs are messier than these documents, so expect lower precision on your own files.
+*Precision* is the share of cards that match a gold card; *recall* is the share of gold cards found (one cloze note with two deletions can find two). Missed today: facts phrased as plain statements ("Producers capture energy from sunlight", "Dominant alleles hide the effect of recessive ones"). Telling those apart from any other sentence needs grammar analysis or the planned AI stage. Real PDFs are messier than these documents, so expect lower precision on your own files.
 
 ```
 python eval/score.py              # writes outputs/eval.md and a deck per document

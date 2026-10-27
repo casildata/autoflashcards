@@ -35,15 +35,34 @@ MAX_SECTION_BULLETS = 8  # a slide's worth; longer bullet lists are textbook lis
 MAX_BACK_BULLETS = 3
 MAX_BULLET_WORDS = 20
 
-# "X is a / are the / was an / is defined as / is called / refers to Y". Not "means": too
-# often a plain verb or a name ("proc means")
-_DEFINING_VERB = r"(?:is|are|was|were)\s+(?:a|an|the|defined\s+as|called|known\s+as)|refers?\s+to"
-_DEFINITION = re.compile(
-    r"^(?=[A-Z])(?P<article>(?:the|a|an)\s+)?"  # a real sentence start, not a fragment
-    r"(?P<term>[^\s,;:]+(?:\s+[^\s,;:]+){0,4}?)\s+"  # up to 5 words, no commas
-    rf"(?P<verb>{_DEFINING_VERB})\s+(?P<rest>\S+\s+\S.*)$",  # at least 2 words after
-    re.IGNORECASE,
+# "X is a / are the / was an / is defined as / is called / refers to / means Y". "means" only
+# before a noun phrase or "-ing" word, so a name such as "proc means and…" doesn't count
+_DEFINING_VERB = (
+    r"(?:is|are|was|were)\s+(?:a|an|the|defined\s+as|called|known\s+as)|refers?\s+to"
+    r"|means(?=\s+(?:a|an|the|that|\w+ing)\b)"
 )
+_DEFINITION_BODY = (
+    r"(?P<article>(?:the|a|an)\s+)?"
+    r"(?P<term>[^\s,;:]+(?:\s+[^\s,;:]+){0,4}?)\s+"  # up to 5 words, no commas
+    rf"(?P<verb>{_DEFINING_VERB})\s+(?P<rest>\S+\s+\S.*)$"  # at least 2 words after
+)
+# a real sentence start, not a fragment: (?-i:) keeps the capital check case-sensitive
+_DEFINITION = re.compile(r"^(?=(?-i:[A-Z]))" + _DEFINITION_BODY, re.IGNORECASE)
+# a later clause, after "; " or ", and ": "X means A, and Y means B"
+_CLAUSE_DEFINITION = re.compile("^" + _DEFINITION_BODY, re.IGNORECASE)
+_CLAUSE_BREAK = re.compile(r",\s+(?:and|while|whereas)\s+|;\s+")
+# "Retention, the share of customers who return, is…": a term, then a description set off by
+# commas, then the sentence goes on
+_APPOSITIVE = re.compile(
+    r"^(?P<term>(?-i:[A-Z])[\w-]*(?:\s+[\w-]+){0,3}),\s+(?:the|a|an)\s+[^,]{8,150},\s+[a-z]"
+)
+# Words that open a sentence without naming a term ("However, the…", "In 2010, a…")
+_NOT_APPOSITIVE_STARTS = {
+    "however", "thus", "therefore", "then", "also", "here", "first", "second", "finally",
+    "moreover", "instead", "today", "in", "on", "at", "for", "after", "before", "during",
+    "when", "while", "if", "because", "although", "unlike", "like", "as", "by", "with",
+    "from", "to", "of",
+}  # fmt: skip
 # Words that mean a sentence subject points elsewhere instead of naming a term
 _NOT_SUBJECTS = {
     "it", "this", "that", "these", "those", "there", "here", "they", "he", "she", "we",
@@ -103,21 +122,46 @@ def bold_lead(block: Block) -> list[Card]:
 
 
 def definition_sentence(block: Block) -> list[Card]:
-    """`A ribosome is a structure that…` → cloze: A {{c1::ribosome}} is a structure that…"""
+    """`A ribosome is a structure that…` → cloze: A {{c1::ribosome}} is a structure that…
+
+    Also "X means Y", one deletion per defining clause ("X means A, and Y means B" → c1, c2),
+    and appositives: `Retention, the share of customers who return, is…`.
+    """
     if block.kind == "heading":
         return []
     cards = []
     for sentence in _SENTENCE_END.split(block.text):
-        match = _DEFINITION.match(sentence)
-        if not match or len(sentence) > _MAX_SENTENCE_CHARS:
+        if len(sentence) > _MAX_SENTENCE_CHARS:
             continue
-        term = match["term"]
-        if any(word.lower() in _NOT_SUBJECTS for word in term.split()):
-            continue
-        start, end = match.span("term")
-        cloze = f"{sentence[:start]}{{{{c1::{term}}}}}{sentence[end:]}"
-        cards.append(_card(block, cloze, "", "definition_sentence", "cloze"))
+        cloze = sentence
+        # from the end, so earlier spans stay valid; numbered c1, c2… in reading order
+        spans = _defined_terms(sentence)
+        for n, (start, end) in reversed(list(enumerate(spans, start=1))):
+            cloze = f"{cloze[:start]}{{{{c{n}::{cloze[start:end]}}}}}{cloze[end:]}"
+        if spans:
+            cards.append(_card(block, cloze, "", "definition_sentence", "cloze"))
     return cards
+
+
+def _names_a_term(term: str) -> bool:
+    return not any(word.lower() in _NOT_SUBJECTS for word in term.split())
+
+
+def _defined_terms(sentence: str) -> list[tuple[int, int]]:
+    """Where the terms a sentence defines are: one per clause, or one appositive."""
+    spans = []
+    pattern, start = _DEFINITION, 0
+    breaks = [(m.start(), m.end()) for m in _CLAUSE_BREAK.finditer(sentence)]
+    for end, next_start in [*breaks, (len(sentence), len(sentence))]:
+        match = pattern.match(sentence[start:end])
+        if match and _names_a_term(match["term"]):
+            spans.append((start + match.start("term"), start + match.end("term")))
+        pattern, start = _CLAUSE_DEFINITION, next_start
+    if not spans and (match := _APPOSITIVE.match(sentence)):
+        term = match["term"]
+        if term.split()[0].lower() not in _NOT_APPOSITIVE_STARTS and _names_a_term(term):
+            spans.append(match.span("term"))
+    return spans
 
 
 def bold_term_bullets(blocks: list[Block], i: int) -> list[Card]:

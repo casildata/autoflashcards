@@ -45,3 +45,27 @@ def test_score_counts_hits_duplicates_extras_and_misses():
     assert [c.kind for c in result.duplicates] == ["cloze"]
     assert [c.front for c in result.extra] == ["Mendel"]
     assert [g["term"] for g in result.missed] == ["Allele"]
+
+
+def test_each_card_claims_its_closest_gold_card():
+    gold = [
+        {"term": "Biotic Factors", "fact": "living parts of an environment"},
+        {"term": "Abiotic Factors", "fact": "nonliving parts of an environment"},
+    ]
+    cards = [
+        basic("Biotic Factors", "Living parts of an environment"),
+        basic("Abiotic Factors", "Nonliving parts of an environment"),
+    ]
+    result = score("doc", cards, gold)
+    assert (result.hits, result.found, result.duplicates) == (2, 2, [])
+
+
+def test_one_cloze_card_can_find_two_gold_cards():
+    gold = [
+        {"term": "Homozygous", "fact": "having two identical alleles"},
+        {"term": "Heterozygous", "fact": "having two different alleles"},
+    ]
+    card = cloze("{{c1::Homozygous}} means having two identical alleles, and "
+                 "{{c2::heterozygous}} means having two different alleles.")  # fmt: skip
+    result = score("doc", [card], gold)
+    assert (result.hits, result.found, result.precision, result.recall) == (1, 2, 1.0, 1.0)

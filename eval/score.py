@@ -25,7 +25,7 @@ from autoflashcards.models import Card, normalize
 ROOT = Path(__file__).parent.parent
 TERM_MATCH = 85  # rapidfuzz ratio between a card's term and the gold term
 FACT_MATCH = 70  # token_set_ratio between a card's answer and the gold fact
-_CLOZE = re.compile(r"\{\{c1::(.+?)\}\}")
+_CLOZE = re.compile(r"\{\{c\d+::(.+?)\}\}")
 
 
 def _plain(text: str) -> str:
@@ -33,19 +33,28 @@ def _plain(text: str) -> str:
     return re.sub(r"^(the|a|an)\s+", "", text).strip(" .:")
 
 
-def asks(card: Card) -> tuple[str, str]:
-    """(term, answer): what the card quizzes and what it says about it."""
-    if card.kind == "cloze" and (hidden := _CLOZE.search(card.front)):
-        return hidden[1], card.front[: hidden.start()] + card.front[hidden.end() :]
-    return card.front, card.back
+def asks(card: Card) -> list[tuple[str, str]]:
+    """(term, answer) pairs: what the card quizzes and what it says about it. A cloze card
+    asks one question per deletion."""
+    if card.kind == "basic":
+        return [(card.front, card.back)]
+    questions = []
+    for hidden in _CLOZE.finditer(card.front):
+        rest = card.front[: hidden.start()] + card.front[hidden.end() :]
+        questions.append((hidden[1], _CLOZE.sub(r"\1", rest)))
+    return questions
+
+
+def _closeness(question: tuple[str, str], gold: dict) -> float:
+    """How well a question's term matches the gold term, or 0 if it isn't a match."""
+    term, answer = question
+    closeness = fuzz.ratio(_plain(term), _plain(gold["term"]))
+    fact = fuzz.token_set_ratio(normalize(answer), normalize(gold["fact"]))
+    return closeness if closeness >= TERM_MATCH and fact >= FACT_MATCH else 0
 
 
 def matches(card: Card, gold: dict) -> bool:
-    term, answer = asks(card)
-    return (
-        fuzz.ratio(_plain(term), _plain(gold["term"])) >= TERM_MATCH
-        and fuzz.token_set_ratio(normalize(answer), normalize(gold["fact"])) >= FACT_MATCH
-    )
+    return any(_closeness(question, gold) for question in asks(card))
 
 
 @dataclass
@@ -53,7 +62,8 @@ class Score:
     name: str
     cards: int = 0
     gold: int = 0
-    hits: int = 0
+    hits: int = 0  # cards that match a gold card not matched before
+    found: int = 0  # gold cards matched (one cloze card can match several)
     duplicates: list[Card] = field(default_factory=list)
     extra: list[Card] = field(default_factory=list)  # cards that match no gold card
     missed: list[dict] = field(default_factory=list)
@@ -64,33 +74,35 @@ class Score:
 
     @property
     def recall(self) -> float:
-        return self.hits / self.gold if self.gold else 0.0
+        return self.found / self.gold if self.gold else 0.0
 
 
 def score(name: str, cards: list[Card], gold: list[dict]) -> Score:
     result = Score(name, len(cards), len(gold))
     found = [False] * len(gold)
     for card in cards:
-        hit = next((i for i, g in enumerate(gold) if not found[i] and matches(card, g)), None)
-        if hit is not None:
-            found[hit] = True
+        # each question claims its closest unmatched gold card ("Biotic" over "Abiotic")
+        new = False
+        for question in asks(card):
+            closeness = [0 if found[i] else _closeness(question, g) for i, g in enumerate(gold)]
+            if max(closeness, default=0):
+                found[closeness.index(max(closeness))] = new = True
+        if new:
             result.hits += 1
         elif any(matches(card, g) for g in gold):
             result.duplicates.append(card)
         else:
             result.extra.append(card)
+    result.found = sum(found)
     result.missed = [g for g, f in zip(gold, found, strict=True) if not f]
     return result
 
 
 def _card_text(card: Card) -> str:
-    term, answer = asks(card)
-    answer = answer.replace("\n", " / ")
-    return (
-        f"`{card.rule}` {term} → {answer}"
-        if card.kind == "basic"
-        else f"`{card.rule}` {card.front}"
-    )
+    if card.kind == "cloze":
+        return f"`{card.rule}` {card.front}"
+    back = card.back.replace("\n", " / ")
+    return f"`{card.rule}` {card.front} → {back}"
 
 
 def report(scores: list[Score], title: str) -> str:
@@ -99,6 +111,7 @@ def report(scores: list[Score], title: str) -> str:
         total.cards += s.cards
         total.gold += s.gold
         total.hits += s.hits
+        total.found += s.found
         total.duplicates += s.duplicates
     lines = [
         f"# {title}",
@@ -108,7 +121,7 @@ def report(scores: list[Score], title: str) -> str:
     ]
     for s in [*scores, total]:
         lines.append(
-            f"| {s.name} | {s.cards} | {s.gold} | {s.hits} | {s.precision:.0%} "
+            f"| {s.name} | {s.cards} | {s.gold} | {s.found} | {s.precision:.0%} "
             f"| {s.recall:.0%} | {len(s.duplicates)} |"
         )
     for s in scores:
