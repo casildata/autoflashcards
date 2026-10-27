@@ -115,7 +115,8 @@ jobs:
       - name: Install package in its own environment
         run: |
           python -m venv /tmp/deps
-          /tmp/deps/bin/python -m pip install --upgrade pip
+          # Python 3.11's venv also seeds setuptools, which pip-audit then checks
+          /tmp/deps/bin/python -m pip install --upgrade pip setuptools
           /tmp/deps/bin/python -m pip install ".[ai]"
 
       - name: Install checkers
