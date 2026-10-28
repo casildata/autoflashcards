@@ -5,6 +5,9 @@ import json
 import sqlite3
 import zipfile
 from dataclasses import replace
+from pathlib import Path
+
+import jsonschema
 
 from autoflashcards.export import (
     BASIC_MODEL_ID,
@@ -17,6 +20,7 @@ from autoflashcards.export import (
 )
 from autoflashcards.models import Block, Card
 
+ROOT = Path(__file__).parent.parent
 CLOZE = "{{c1::Cells}} are the unit of life."
 CARDS = [
     Card("Osmosis", "movement of water", "term_colon", "cells.md", ("Cell Biology", "Transport")),
@@ -102,6 +106,23 @@ def test_json_lists_blocks_cards_and_drops(tmp_path):
     assert data["blocks"][0]["text"] == "Osmosis: movement of water"
     assert data["cards"][0]["source_label"] == "cells.md · Cell Biology › Transport"
     assert data["removed"][0]["reason"] == "too long"
+
+
+def test_json_matches_the_schema(tmp_path):
+    schema = json.loads((ROOT / "docs" / "json-output.schema.json").read_text(encoding="utf-8"))
+    out = tmp_path / "deck.json"
+    blocks = [
+        Block("heading", "Transport", "cells.pdf", ("Cell Biology",), page=4),
+        Block("bullet", "Osmosis: movement of water", "cells.md", bold_lead="Osmosis"),
+    ]
+    diagram = Card(
+        "Cell", "", "diagram", "cells.pdf", page=2, kind="diagram", media=("cell.png",),
+        occlusion="{{c1::image-occlusion:rect:left=.1:top=.2:width=.3:height=.1}}",
+        answers="{{c1::Nucleus}}", typed=True, sio="cell.png",
+    )
+    write_json(blocks, [*CARDS, diagram], [(CARDS[1], "too long")], out)
+    # every Block and Card field is required and no others are allowed: a new field fails here
+    jsonschema.validate(json.loads(out.read_text(encoding="utf-8")), schema)
 
 
 def test_preview_text():

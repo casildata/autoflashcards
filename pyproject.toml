@@ -26,6 +26,7 @@ dependencies = [
 ai = ["anthropic>=2.3", "pydantic>=2"]  # --ai claude (pydantic also for --ai ollama)
 dev = [
     "anthropic>=2.3",  # same as [ai], so the AI stage is tested
+    "jsonschema>=4.18",  # checks the --json output against docs/json-output.schema.json
     "pydantic>=2",
     "pytest>=8",
     "reportlab>=4",  # builds the test PDFs

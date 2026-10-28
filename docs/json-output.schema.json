@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "autoflashcards --json output",
+  "description": "Written by export.write_json: the extracted text, the cards in the deck and the cards that were dropped.",
+  "type": "object",
+  "required": ["blocks", "cards", "removed"],
+  "additionalProperties": false,
+  "properties": {
+    "blocks": {
+      "description": "The text extracted from the file, after headers, footers and page numbers are removed.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/block" }
+    },
+    "cards": {
+      "description": "The cards in the deck.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/card" }
+    },
+    "removed": {
+      "description": "The cards that were dropped, each with the reason.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/removedCard" }
+    }
+  },
+  "$defs": {
+    "headingPath": {
+      "description": "The headings above the text, outermost first.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "page": {
+      "description": "1-based page number; null for formats without pages, such as Markdown.",
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "block": {
+      "type": "object",
+      "required": ["kind", "text", "source", "heading_path", "page", "bold_lead"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["heading", "bullet", "paragraph"] },
+        "text": { "type": "string" },
+        "source": { "description": "File name.", "type": "string" },
+        "heading_path": { "$ref": "#/$defs/headingPath" },
+        "page": { "$ref": "#/$defs/page" },
+        "bold_lead": {
+          "description": "Bold text that starts the block, usually a term being defined; empty if none.",
+          "type": "string"
+        }
+      }
+    },
+    "cardFields": {
+      "type": "object",
+      "required": [
+        "front", "back", "rule", "source", "heading_path", "page", "kind",
+        "media", "occlusion", "answers", "typed", "sio", "source_label"
+      ],
+      "properties": {
+        "front": {
+          "description": "For cloze cards, the full text with {{c1::...}} around the hidden words.",
+          "type": "string"
+        },
+        "back": { "description": "Empty for cloze cards.", "type": "string" },
+        "rule": { "description": "Name of the rule that made the card.", "type": "string" },
+        "source": { "description": "File name.", "type": "string" },
+        "heading_path": { "$ref": "#/$defs/headingPath" },
+        "page": { "$ref": "#/$defs/page" },
+        "kind": { "enum": ["basic", "cloze", "diagram"] },
+        "media": {
+          "description": "Diagram cards: the image file.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "occlusion": {
+          "description": "Diagram cards: the boxes, in Anki Image Occlusion markup.",
+          "type": "string"
+        },
+        "answers": {
+          "description": "Diagram cards: the labels as cloze deletions numbered like the boxes.",
+          "type": "string"
+        },
+        "typed": { "description": "Diagram cards: a box to type the label.", "type": "boolean" },
+        "sio": {
+          "description": "Diagram cards: image and boxes for the Simple Image Occlusion add-on.",
+          "type": "string"
+        },
+        "source_label": {
+          "description": "Where the card came from, e.g. \"notes.pdf · p.12 · Cells › Transport\".",
+          "type": "string"
+        }
+      }
+    },
+    "card": {
+      "$ref": "#/$defs/cardFields",
+      "unevaluatedProperties": false
+    },
+    "removedCard": {
+      "$ref": "#/$defs/cardFields",
+      "required": ["reason"],
+      "properties": {
+        "reason": { "description": "Why the card was dropped.", "type": "string" }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

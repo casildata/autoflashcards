@@ -249,7 +249,13 @@ To score your own PDFs, put them in `eval/private/` (ignored by git) with a `<na
 
 #### The `--json` file
 
-Three lists: `blocks` (the text extracted from the file, after headers, footers and page numbers are removed), `cards` (the cards in the deck) and `removed` (the cards that were dropped, each with a `reason`).
+| List | Contents |
+|---|---|
+| `blocks` | The text extracted from the file, after headers, footers and page numbers are removed |
+| `cards` | The cards in the deck |
+| `removed` | The cards that were dropped, each with a `reason` |
+
+The full format is in [`docs/json-output.schema.json`](docs/json-output.schema.json) (JSON Schema 2020-12).
 
 ```json
 {
@@ -272,6 +278,11 @@ Three lists: `blocks` (the text extracted from the file, after headers, footers 
       "heading_path": ["Cell Biology", "Transport"],
       "page": 4,
       "kind": "basic",
+      "media": [],
+      "occlusion": "",
+      "answers": "",
+      "typed": false,
+      "sio": "",
       "source_label": "cells.pdf · p.4 · Cell Biology › Transport"
     }
   ],
@@ -284,6 +295,11 @@ Three lists: `blocks` (the text extracted from the file, after headers, footers 
       "heading_path": ["Cell Biology", "Transport"],
       "page": 5,
       "kind": "basic",
+      "media": [],
+      "occlusion": "",
+      "answers": "",
+      "typed": false,
+      "sio": "",
       "source_label": "cells.pdf · p.5 · Cell Biology › Transport",
       "reason": "same front as an earlier card"
     }
@@ -297,8 +313,13 @@ Three lists: `blocks` (the text extracted from the file, after headers, footers 
 | `heading_path` | The headings above the text, outermost first |
 | `page` | 1-based page number; `null` for Markdown |
 | `bold_lead` | Bold text that starts the block, usually a term being defined; empty if none |
-| `kind` (card) | `basic` (front and back) or `cloze`: the whole sentence is in `front` with `{{c1::…}}` around the hidden words, and `back` is empty |
+| `kind` (card) | `basic` (front and back), `cloze` (the whole sentence is in `front` with `{{c1::…}}` around the hidden words, and `back` is empty) or `diagram` |
 | `rule` | The rule that made the card (see [Rules](#rules)), or `ai_<backend>` for AI cards |
+| `media` | Diagram cards: the image file; empty otherwise |
+| `occlusion` | Diagram cards: the boxes over the labels, in Anki Image Occlusion markup; empty otherwise |
+| `answers` | Diagram cards: the labels as cloze deletions numbered like the boxes; empty otherwise |
+| `typed` | Diagram cards: whether there's a box to type the label; `false` otherwise |
+| `sio` | Diagram cards: the image and boxes for the Simple Image Occlusion add-on; empty otherwise |
 | `source_label` | The source line shown under the answer in Anki |
 | `reason` | `same front as an earlier card`, `near-duplicate of an earlier card`, `too long` or `empty side` |
 
