@@ -58,7 +58,7 @@ Each paragraph or bullet is checked against these rules in order. The first rule
 - `definition_sentence` looks for "X is a / are the / was an / is defined as / is called / is known as / refers to / means …" at the start of a sentence. It skips sentences whose subject is a pronoun ("It is a…", "There are…"). A sentence that defines two terms ("Homozygous means having two identical alleles, and heterozygous means…") becomes one cloze note with two deletions, so Anki quizzes each term. It also catches a term followed by its description between commas: "{{c1::Retention}}, the share of customers who come back, is…".
 - The two slide rules also work on slides exported to PDF. A card's back holds up to three bullets, one per line. `slide_title_bullets` only uses short sections made entirely of bullets (up to 8) on the slide's own page, so the headings of a textbook don't turn into list cards. It skips titles that describe a picture ("Image of…", "Example of…") and slides whose bullets are already `Term: definition` cards.
 - **Skipped everywhere:** figure and table captions, labels such as `Note:` or `Keywords:`, and sections headed References, Bibliography, Table of contents, Thanks or Credits.
-- **Filtered after the rules run:** cards with the same front, near-identical cards (90% similar or more) and overly long cards. `--json` lists them.
+- **Filtered after the rules run:** cards with the same front, near-identical cards (90% similar or more) and overly long cards. Of two duplicates, the one whose back looks more like a full definition is kept (4 to 30 words, a complete sentence, not cut after "is"); on a tie the first one stays. `--json` lists them.
 
 ### AI cards
 
@@ -272,23 +272,6 @@ The full format is in [`docs/json-output.schema.json`](docs/json-output.schema.j
   "cards": [
     {
       "front": "Osmosis",
-      "back": "movement of water",
-      "rule": "term_colon",
-      "source": "cells.pdf",
-      "heading_path": ["Cell Biology", "Transport"],
-      "page": 4,
-      "kind": "basic",
-      "media": [],
-      "occlusion": "",
-      "answers": "",
-      "typed": false,
-      "sio": "",
-      "source_label": "cells.pdf · p.4 · Cell Biology › Transport"
-    }
-  ],
-  "removed": [
-    {
-      "front": "Osmosis",
       "back": "the movement of water across a membrane",
       "rule": "bold_lead",
       "source": "cells.pdf",
@@ -300,8 +283,25 @@ The full format is in [`docs/json-output.schema.json`](docs/json-output.schema.j
       "answers": "",
       "typed": false,
       "sio": "",
-      "source_label": "cells.pdf · p.5 · Cell Biology › Transport",
-      "reason": "same front as an earlier card"
+      "source_label": "cells.pdf · p.5 · Cell Biology › Transport"
+    }
+  ],
+  "removed": [
+    {
+      "front": "Osmosis",
+      "back": "movement of water",
+      "rule": "term_colon",
+      "source": "cells.pdf",
+      "heading_path": ["Cell Biology", "Transport"],
+      "page": 4,
+      "kind": "basic",
+      "media": [],
+      "occlusion": "",
+      "answers": "",
+      "typed": false,
+      "sio": "",
+      "source_label": "cells.pdf · p.4 · Cell Biology › Transport",
+      "reason": "same front as a later, better card"
     }
   ]
 }
@@ -321,7 +321,7 @@ The full format is in [`docs/json-output.schema.json`](docs/json-output.schema.j
 | `typed` | Diagram cards: whether there's a box to type the label; `false` otherwise |
 | `sio` | Diagram cards: the image and boxes for the Simple Image Occlusion add-on; empty otherwise |
 | `source_label` | The source line shown under the answer in Anki |
-| `reason` | `same front as an earlier card`, `near-duplicate of an earlier card`, `too long` or `empty side` |
+| `reason` | `same front as an earlier card` or `near-duplicate of an earlier card` (the earlier card scored at least as well), `same front as a later, better card` or `near-duplicate of a later, better card` (a later card's back looked more like a full definition and took this card's place), `too long`, `empty side` or `back repeats front` |
 
 ## Reading your cards in Anki
 
