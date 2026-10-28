@@ -11,6 +11,8 @@ NEAR_DUPLICATE = 90  # rapidfuzz ratio (0-100) of front + back at or above which
 
 
 def _problem(card: Card) -> str | None:
+    if card.kind == "diagram":  # its "back" is the list of labels, as long as the figure needs
+        return None
     if card.kind == "cloze":
         return "too long" if len(card.front) > MAX_CLOZE_CHARS else None
     if len(card.front) < 2 or not card.back:
@@ -37,7 +39,11 @@ def dedupe(cards: list[Card]) -> tuple[list[Card], list[tuple[Card, str]]]:
         if front in fronts:  # also required by Anki: the front is the note ID
             removed.append((card, "same front as an earlier card"))
             continue
-        if any(fuzz.ratio(text, t, score_cutoff=NEAR_DUPLICATE) for t in texts):
+        # diagram cards differ in their images, which the text doesn't show
+        near = card.kind != "diagram" and any(
+            fuzz.ratio(text, t, score_cutoff=NEAR_DUPLICATE) for t in texts
+        )
+        if near:
             removed.append((card, "near-duplicate of an earlier card"))
             continue
         fronts.add(front)

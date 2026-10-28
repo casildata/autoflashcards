@@ -1,46 +1,26 @@
 # Changelog
 
-## Unreleased
+## Released
 
-- `--preview` prints the cards, numbered with their rule and source line, instead of writing a deck; `--preview-file FILE` saves that list to a file. An output file that another program has open (Excel locks a `.csv` it shows) now stops the run with a one-line message instead of a traceback.
-- `--csv` opens cleanly in Excel: comma-separated (Excel doesn't split a double-clicked `.csv` on tabs), UTF-8 with a BOM (without one, Excel showed "·" as "Â·"), Front, Back and Tags first with the note ID last, and a `#columns` line that names the columns for Anki and serves as Excel's header row.
-- The run ends with dropped cards counted by reason (`Dropped 3 card(s): 2 same front as an earlier card, 1 too long; run with --json to review them`), also when no cards are left. Before, it said "dropped as duplicates or too long" whatever the reason. `eval/score.py` no longer crashes when its output is piped or redirected on Windows.
-- CI `dependencies` job: a license gate (`pip-licenses`, fails on GPL-family licenses and packages that state none; `frozendict`, LGPL-3.0 and required by `genanki`, is the one reviewed exception) and `pip-audit`, both run against a clean install of `.[ai]`. README: License section; the source line already shows PDF page numbers.
-- AI cards: `--ai claude` (Claude Haiku 5.5 by default, `anthropic` SDK structured output), `--ai claude-code` (runs `claude -p` on a Claude Pro/Max plan, no API key) or `--ai ollama` (local), with `--model`. Text goes in chunks of about 3,000 tokens; every card should quote its source line; cards whose quote, term or answer isn't in the document are dropped. One retry on a malformed reply, then the chunk is skipped with a warning; replies are cached on disk; requests and an input-token estimate are printed first. Install with `pip install ".[ai]"`.
-- Eval precision counts cards outside the gold set that were judged correct by hand (`eval/gold/<name>.judged.jsonl`); cards with no verdict yet are reported as *unjudged* and count against it. Before, every card the term-only gold set didn't list counted as wrong.
-- Eval with `--ai claude-code`: recall 80% → 94%, precision 100% → 86%, no card obeyed the hidden instruction.
-- Eval with `--ai ollama` (llama3.2 3B, local): recall 97%, precision 84%, no card obeyed the hidden instruction. Cards without a quote (small models often leave it empty) are kept when both term and answer come from the text. Ollama requests use a 16K context and a 4,096-token reply cap: the default 4K context left no room to answer and the model never stopped. The JSON schema also goes in the prompt, as Ollama's docs advise.
-- Eval: a hostile document with a hidden instruction aimed at AI models, an *Injected* column counting cards that obey it, and `eval/score.py --ai`. CI's `eval-ai` job runs it on manual trigger only.
+- Diagram cards (`--diagrams`): each labeled figure becomes an Anki Image Occlusion note (Anki 23.10+) with a box over every label and one card per box. Labels come from the PDF's text or Tesseract OCR. The back shows the card's label and its source. Boxes can be fixed in Anki's occlusion editor and labels in the `Answers` field.
+  - `--type-answers` adds a box to type each label.
+  - `--sio` writes notes for the Simple Image Occlusion add-on instead. `--link-pdf` links each note to its PDF page.
+  - Decks from earlier versions: delete the `Image Occlusion (autoflashcards)` note type in Anki before importing a new deck.
+- `--preview` lists the cards instead of writing a deck. A locked output file gives a clear error instead of a traceback.
+- `--csv` opens cleanly in Excel.
+- Dropped cards are counted by reason at the end of a run.
+- CI: license check and `pip-audit`.
+- AI cards: `--ai claude`, `--ai claude-code` or `--ai ollama`. Cards whose quote or answer isn't in the document are dropped.
+- Eval: hand-judged precision, and a hostile document that tests whether AI cards obey a hidden instruction. With `--ai claude-code`, recall is 94% and precision 86%. With `--ai ollama` (llama3.2 3B), recall is 97% and precision 84%. Neither obeyed the hidden instruction.
 
-- `definition_sentence`: "X means Y" (before a noun phrase or "-ing" word), one cloze deletion per defining clause ("X means A, and Y means B" → c1, c2), and appositives ("Retention, the share of customers who return, is…"). Fixed: the sentence-start capital check was case-insensitive, so lowercase fragments could become cards. Eval recall 71% → 81%, precision unchanged at 100%; no change on the real PDFs checked.
-- `eval/score.py` counts each cloze deletion as a question, and each question claims only its closest gold card.
+## Earlier Version
 
-- Evaluation: `eval/score.py` scores the rules against hand-written gold cards for four generated documents (handout, slide deck, two-column article, textbook) and writes `outputs/eval.md`; `--private` scores your own PDFs in the git-ignored `eval/private/`. Baseline: 100% precision, 71% recall over 31 gold cards. CI's new `e2e` job runs it on every push.
-
-- PDF slide handouts (several slides per page): page layout is split into text boxes by recursive XY-cut, so slides are read one at a time and two-column articles with narrow gutters are read column by column. Lines that stop short of their box's edge end an item even without a period, and a `Term = …` line always starts a new one.
-- Headings are judged against each page's body text size (pages with little text use the document's), and large prose that carries on into a lowercase line isn't a heading.
-- `slide_title_bullets` stays on the title's page, and accepts short paragraphs without a closing period as bullets (slides whose bullet markers are pictures).
-- `term_colon` skips contact labels (`E-mail:`, `Tel:`, `DOI:`…) and terms with unbalanced parentheses.
-
-- Slide rules: `bold_term_bullets` (an all-bold bullet and the bullets that explain it) and `slide_title_bullets` (a slide title and its bullets, for short all-bullet sections only). Rules now see the blocks after the one they start from.
-- `term_colon` also accepts `=`, `→` and `->` as separators; decades ("1970s") aren't terms.
-- Card backs with several bullets show one per line in Anki.
-- Sections headed Table of contents, Thanks, Questions or Credits are skipped, judged by the nearest heading only. Number-only lines ("11.2" on divider slides) are no longer headings.
-- PDF text: when letter boxes overlap (PowerPoint exports have wrong glyph widths), the PDF's own space characters are used instead of gap measurement, which fixes run-together words in exported slides.
-
-- New rules: `bold_lead` (a bold term followed by text) and `definition_sentence` ("X is a…", "X refers to…" sentences become cloze cards). Rules run in order and the first match per block wins. `--rules` picks a subset.
-- Filter stage: cards with the same front, near-duplicates (rapidfuzz ratio ≥ 90) and overly long or empty cards are dropped, with a reason.
-- `--csv` writes an Anki text-import file with file headers (built-in Basic and Cloze note types, same note IDs as the `.apkg`). `--json` writes blocks, cards and dropped cards.
-- Running headers and footers are found on 40% of pages instead of half, which catches books that alternate left and right page footers.
-
-- PDF input (pdfplumber). The structure stage finds headings by font size and bold text, removes running headers, footers and page numbers, joins wrapped lines and hyphenated words, and reads two-column pages left column first. Cards from PDFs show their page number.
-- Word spacing scales with font size, and duplicated glyphs are removed, which fixes run-together and split words in some typeset PDFs. Glyphs the PDF doesn't map to text become U+FFFD; at the start of a line they are read as bullets.
-- `term_colon` skips figure and table captions, `Keywords:`/`Abstract:` labels, and anything under a References or Bibliography heading.
-- Test PDFs are generated by `tests/make_fixtures.py` (reportlab, dev only).
-
-- Markdown to `.apkg`: `autoflashcards notes.md` reads headings, list items and paragraphs, makes cards from "Term: definition" lines, and writes an Anki deck.
-- Each card shows its source file and heading path, and is tagged with its headings and the rule that made it.
-- Note IDs come from the deck name and the card front, so re-importing an edited file updates cards instead of duplicating them.
-
-- Project skeleton: `src/` package, `autoflashcards` command (`--help`, `--version`), MIT license.
-- CI: ruff lint and format check, tests on Python 3.11 and 3.14 on Linux and Windows, gitleaks.
+- `definition_sentence` handles "X means Y", several definitions in one sentence, and appositives. Eval recall 71% → 81%.
+- Evaluation: `eval/score.py` scores the rules against hand-written gold cards and runs in CI. Baseline: 100% precision, 71% recall.
+- Slide handouts with several slides per page are read slide by slide, and two-column articles column by column.
+- Slide rules: `bold_term_bullets` and `slide_title_bullets`.
+- Rules: `bold_lead` and `definition_sentence`. `--rules` picks a subset.
+- Duplicate, near-duplicate and overlong cards are filtered out. `--csv` and `--json` outputs.
+- PDF input: headings, running headers and footers, wrapped lines and two-column pages. Cards show their page number.
+- Markdown to `.apkg`. Cards show their source and are tagged by heading and rule. Re-imports update cards instead of duplicating them.
+- Project skeleton, MIT license, and CI (lint, tests on Linux and Windows, gitleaks).

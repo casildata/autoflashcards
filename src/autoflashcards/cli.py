@@ -9,9 +9,17 @@ from typing import Annotated
 
 import typer
 
-from autoflashcards import __version__, readers, rules
+from autoflashcards import __version__, diagrams, readers, rules
 from autoflashcards.dedupe import dedupe
-from autoflashcards.export import preview_text, write_apkg, write_csv, write_json
+from autoflashcards.export import (
+    SIO_NOTETYPE,
+    preview_text,
+    write_apkg,
+    write_csv,
+    write_json,
+    write_media,
+    write_sio_csv,
+)
 from autoflashcards.models import Block, Card
 
 app = typer.Typer(add_completion=False)
@@ -87,7 +95,11 @@ def _writing(path: Path) -> Iterator[None]:
 def main(
     inputs: Annotated[
         list[Path],
-        typer.Argument(exists=True, dir_okay=False, help="PDF or Markdown files."),
+        typer.Argument(
+            exists=True,
+            dir_okay=False,
+            help="PDF or Markdown files, or diagram pictures (PNG, JPEG; need Tesseract).",
+        ),
     ],
     out: Annotated[
         Path | None, typer.Option(help="Output .apkg (default: first input's name).")
@@ -127,6 +139,46 @@ def main(
         str | None,
         typer.Option(help="Model for --ai (default: claude-haiku-5-5, or llama3.2 for ollama)."),
     ] = None,
+    with_diagrams: Annotated[
+        bool,
+        typer.Option(
+            "--diagrams",
+            help="Also make Anki Image Occlusion notes from labeled diagrams in PDFs: one note "
+            "per diagram, a box over every label, one card per box.",
+        ),
+    ] = False,
+    type_answers: Annotated[
+        bool,
+        typer.Option(
+            "--type-answers",
+            help="Diagram notes: each card also has a box to type the label of its box, "
+            "checked against the note's Answers field.",
+        ),
+    ] = False,
+    sio: Annotated[
+        bool,
+        typer.Option(
+            "--sio",
+            help=f"Diagram notes for the Simple Image Occlusion add-on instead: written to "
+            f"OUT-sio.csv for its '{SIO_NOTETYPE}' note type, not to the .apkg, with their "
+            "images in --media-dir. Its editor adds and removes boxes and edits their labels.",
+        ),
+    ] = False,
+    media_dir: Annotated[
+        Path | None,
+        typer.Option(
+            help="With --sio: folder for the images (default: OUT-media). Give Anki's "
+            "collection.media folder to skip copying them there yourself."
+        ),
+    ] = None,
+    link_pdf: Annotated[
+        bool,
+        typer.Option(
+            "--link-pdf",
+            help="With --sio: make each diagram note's header a link to its page in the "
+            "PDF. The link holds the PDF's full path on this computer.",
+        ),
+    ] = False,
     version: Annotated[
         bool,
         typer.Option("--version", callback=_print_version, is_eager=True, help="Show version."),
@@ -135,6 +187,12 @@ def main(
     """Build an Anki deck from INPUT files."""
     deck_name = deck or inputs[0].stem
     out = out or inputs[0].with_suffix(".apkg")
+
+    if link_pdf and not sio:
+        typer.echo(
+            "Error: --link-pdf needs --sio (the link is a field of that note type)", err=True
+        )
+        raise typer.Exit(code=2)
 
     selected = None
     if rule_names:
@@ -145,9 +203,15 @@ def main(
             raise typer.Exit(code=2)
 
     blocks = []
+    found: list[diagrams.Diagram] = []
     for path in inputs:
         try:
+            if path.suffix.lower() in diagrams.IMAGE_SUFFIXES:
+                found += diagrams.read_image(path)
+                continue
             blocks += readers.read(path)
+            if with_diagrams and path.suffix.lower() == ".pdf":
+                found += diagrams.read_pdf(path, warn=lambda m: typer.echo(m, err=True))
         except ValueError as err:
             typer.echo(f"Error: {err}", err=True)
             raise typer.Exit(code=2) from err
@@ -155,6 +219,8 @@ def main(
     cards = rules.generate(blocks, selected)
     if ai:
         cards += _ai_cards(blocks, ai, model)
+    diagram_cards, media = diagrams.cards(found, typed=type_answers)
+    cards += diagram_cards
     cards, removed = dedupe(cards)  # rule cards come first, so they win over AI duplicates
     if json:  # written even when there are no cards: that's when it's most useful
         with _writing(out.with_suffix(".json")):
@@ -177,10 +243,41 @@ def main(
         typer.echo(preview_text(cards), nl=False)
         return
 
-    with _writing(out):
-        write_apkg(cards, deck_name, out)
-    typer.echo(f"Wrote {len(cards)} cards to {out}")
+    sio_cards = [c for c in cards if c.kind == "diagram"] if sio else []
+    apkg_cards = [c for c in cards if c not in sio_cards]
+    if apkg_cards:
+        with _writing(out):
+            write_apkg(apkg_cards, deck_name, out, media)
+        typer.echo(f"Wrote {len(apkg_cards)} cards to {out}")
+    if sio_cards:
+        sio_csv = out.with_name(f"{out.stem}-sio.csv")
+        media_dir = media_dir or out.with_name(f"{out.stem}-media")
+        pdfs = None
+        if link_pdf:
+            pdfs = {p.name: p for p in inputs if p.suffix.lower() == ".pdf"}
+            typer.echo(
+                "Warning: --link-pdf puts each PDF's full path in the notes "
+                f"({', '.join(str(p.resolve()) for p in pdfs.values())}). The links open only "
+                "on this computer, and only while the PDF stays at that path (moving or "
+                "renaming it breaks them; run again and re-import to fix them). Anki on a "
+                "phone can't open them. Whether the PDF opens at the figure's page depends on "
+                "your PDF viewer; some open it at page 1. Anyone you share these notes with "
+                "sees the path, which can include your user name and folder names.",
+                err=True,
+            )
+        with _writing(sio_csv):
+            write_sio_csv(sio_cards, deck_name, sio_csv, pdfs)
+        images = write_media(sio_cards, media, media_dir)
+        typer.echo(
+            f"Wrote {len(sio_cards)} diagram notes to {sio_csv} and {images} images to "
+            f"{media_dir}. In Anki, the images must be in your profile's collection.media "
+            f"folder; then File > Import {sio_csv.name} (needs the '{SIO_NOTETYPE}' note "
+            "type from the Simple Image Occlusion add-on)."
+        )
     if csv:
         with _writing(out.with_suffix(".csv")):
             write_csv(cards, deck_name, out.with_suffix(".csv"))
-        typer.echo(f"Wrote {len(cards)} cards to {out.with_suffix('.csv')}")
+        text_cards = [c for c in cards if c.kind != "diagram"]
+        skipped = len(cards) - len(text_cards)
+        note = f" ({skipped} diagram card(s) are in the .apkg only)" if skipped and not sio else ""
+        typer.echo(f"Wrote {len(text_cards)} cards to {out.with_suffix('.csv')}{note}")

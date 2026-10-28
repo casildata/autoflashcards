@@ -17,6 +17,7 @@
 - **Works offline by default:** five extraction rules read PDF layout (font size, bold text, columns, multi-slide handouts) and make cards. On the evaluation set that is **100% precision and 80% recall** against 35 hand-written gold cards.
 - **Optional AI stage raises recall:** adding Claude Haiku 5.5 brings recall to **94%** (precision 86%). A local Llama 3.2 3B model brings it to **97%** (precision 84%), and no text leaves the computer.
 - **AI output is checked, not trusted:** each AI card must quote the line it came from, and cards that aren't grounded in the source file are dropped. A test document with a hidden instruction aimed at AI models produced **0 obeying cards** with either model.
+- **Diagram cards (`--diagrams`):** labeled figures become notes of Anki's built-in Image Occlusion type, with a box over every label, so a misplaced or missing box is fixed by dragging it in Anki's own occlusion editor. Every box is independent, so you can resize one without touching the others; each box is also its own card. With `--type-answers`, you type the label and Anki marks what you got wrong. Labels come from the PDF's text, or from Tesseract OCR when they're part of a picture. Each figure's image is drawn without the slide behind it: the figure, its labels and its leader lines, no background, sticky notes or pins. On a real 18-page biology handout it found 34 figures with 297 labels; 32 are whole diagrams, one is a picture of a table and one a title slide (see [Limitations](#limitations--lessons-learned)).
 - **Built to be audited:** every card shows its file, page and heading path, and is tagged with the rule that made it. `--json` lists every dropped card and the reason.
 - **Caveat:** the evaluation documents are small and generated, built from layouts seen in real course material. Expect lower precision on real PDFs.
 
@@ -34,6 +35,8 @@ flowchart LR
     C -.->|--ai| E[AI cards<br/>ai.py]
     D --> F[Filter + dedupe<br/>dedupe.py]
     E -.-> F
+    B -.->|--diagrams| I[Diagram cards<br/>diagrams.py]
+    I -.-> F
     F --> G[Export<br/>export.py]
     G --> H[.apkg / .csv / .json]
 ```
@@ -64,6 +67,30 @@ The rules only catch facts written in recognizable patterns. With `--ai`, the te
 - **Grounding:** the model is asked to quote the line each card came from. A card is dropped if its quote isn't in your file, or if its answer is mostly words your file doesn't use, and the run reports how many were dropped. The quote also gives the card its real page and heading. Small local models often leave the quote out. Those cards are kept only if their term also comes from your file.
 - **Prompt injection:** the file's text is sent as data inside `<document>` tags, the model is told not to follow instructions in it, and its reply must match a JSON schema.
 - **Cost and failures:** before any request, the run prints the number of requests and an estimate of input tokens. Replies are cached on disk, so running the same file again costs nothing. A failed request skips that part of the file with a warning. A missing key, a stopped Ollama or an unknown model stops the run (exit code 2).
+
+### Diagram cards
+
+With `--diagrams`, labeled figures become cards. A figure is a picture in the PDF, or a cluster of drawn shapes (ruled tables are skipped). Its labels are short text lines on it or within half an inch of it. When a picture has no text on it, its labels are read with Tesseract OCR. Labels set on two lines ("Nuclear" over "envelope") are joined.
+
+Each figure becomes one note of Anki's built-in **Image Occlusion** note type (Anki 23.10 or newer): the figure's image, and a rectangle over each label. Anki draws the masks and reveals them on the answer side, and the boxes can be edited in Anki's occlusion editor.
+
+| Option | Cards per figure | Front | Back |
+|---|---|---|---|
+| `--diagrams` | one per label | the label to name is masked in red, the others in yellow ("hide all, guess one") | that label revealed, and written below the figure |
+| `--diagrams --type-answers` | one per label | the same, and a box to type the label | that label revealed, and your typing compared with it letter by letter |
+
+A figure is one note, so a box is fixed once for all its cards. Each box has its own cloze number, which is what lets Anki's editor move and resize it on its own. To see the whole figure, press the card's Toggle Masks button on the back.
+
+- **Figures cut into strips:** some PDFs (slide handouts exported from PowerPoint or Google Slides, for example) store a picture as many thin strips. Strips that touch and line up edge to edge are joined back into one picture before anything else, so a figure comes out whole instead of cut off at a strip.
+- **No slide background:** the figure's image is drawn from the PDF with only the pictures and shapes that lie inside the figure's frame, and all text. A slide background, a sticky note or a pin around the figure is left out, so the image has a white background.
+- **Not diagrams:** pictures under 1 inch (bullet markers, logos), pictures with another picture on them or mostly covered by a later one of about the same size (slide backgrounds, textures), and figures with a sentence or a wrapped line of text on them (text boxes on a slide background). Figure captions, panel letters such as "(a)", scale bars ("0.5 µm"), slide titles and bullet text next to a figure are not labels: nearby lines are joined first, so a bullet that wraps reads as a sentence.
+- **The label on the back:** the note has two fields beyond Anki's own. `Answers` holds the labels as cloze deletions numbered like the boxes (`{{c1::Nucleus}}`, `{{c2::Nucleolus}}`, …), and the back of the card for box 2 shows only the text of `{{c2::…}}`, so text to speech has the label to read. `Source` holds the file and page, shown under the card as on the text cards. `Back Extra` is left empty for your own notes.
+- **Typing the answer (`--type-answers`):** the notes get the `Image Occlusion (autoflashcards, type in the answer)` note type instead, whose cards show `{{type:cloze:Answers}}`, Anki's type-in box for the deletion with the card's number; the typing check on the back shows the label. `Answers` has one label per line, so to fix a label that OCR misread, open the note (Browse) and edit its line. A box you draw in Anki's editor gets the next number and its own card; add a matching `{{cN::label}}` line to `Answers` to give it a label. With `--type-answers`, until `Answers` has that line, the card shows, when you study it (Browse's Preview has no typing box, so it shows nothing), "Box 22 has no answer yet. To type it, add `{{c22::label}}` to this note's Answers field" where the typing box goes; add that line and the card asks for the label. If you'd rather type each label on its box, `--sio` (below) stores the label with the box, but makes one card per figure.
+- **Fixing boxes in Anki:** open the note (Browse, select it) and Anki shows its occlusion editor: drag a box to move or resize it, delete a box that covers a slide title or a scale bar, or draw one that OCR missed. Anki keeps the card of a deleted box, showing the figure with no boxes and a note saying the box was deleted: delete the box's line in `Answers`, then run Tools > Empty Cards to remove the card.
+- The note type is `Image Occlusion (autoflashcards)`: Anki's own Image Occlusion note type (same fields, templates and CSS, copied from Anki 26.09, plus the `Answers` and `Source` fields) under a fixed ID, so re-importing updates notes instead of duplicating them. Anki won't move a note to another note type on import, so a figure imported once with `--type-answers` and once without is skipped the second time; to switch, delete the diagram notes first. Decks made before this version have the typing note type under the old name `Image Occlusion (autoflashcards)`: delete it (Tools > Manage Note Types; this deletes its notes) before importing a new deck, or Anki skips those figures and adds an empty copy of the note type. Diagram notes are tagged `afg::rule::diagram`. Each figure is stored once, as one JPEG inside the `.apkg`; the boxes are positions in the note, not drawn into the image. The biology handout's deck holds 34 images (1.6 MB with the text cards). Diagram notes are left out of `--csv`, which can't carry images, and need Anki 23.10 or newer; on a phone, use a version of AnkiDroid or AnkiMobile that supports Image Occlusion.
+- You can also give a picture file (`.png`, `.jpg`) as input; it is read as one diagram with OCR.
+- **For the Simple Image Occlusion add-on (`--sio`):** if you use the [Simple Image Occlusion](https://ankiweb.net/shared/info/675107747) add-on, `--sio` writes the diagram notes for its `Image Occlusion Simple (v2)` note type instead of putting them in the `.apkg`. Each box carries its own label, so in the add-on's editor you add, remove and resize boxes and type each box's label in one place; one note per figure, whose card asks you to type the labels box by box. The add-on's note type isn't autoflashcards' to ship, so these notes come as a CSV for Anki's import (`OUT-sio.csv`, with headers that pick the note type, deck and tags) plus a folder of images (`OUT-media`, or `--media-dir`). Copy the images into your Anki profile's `collection.media` folder (on Windows `%APPDATA%\Anki2\<profile>\collection.media`), or point `--media-dir` there, then import the CSV with File > Import. Re-importing updates the notes instead of duplicating them. An import of the handout's CSV into a copy of a collection with the add-on's note type gave 34 notes, one card each. A note's ID comes from its file, page and figure number, so if a new version finds more or fewer figures on a page, re-importing replaces a note with a different figure and loses the box edits made in Anki; delete the old diagram notes (tag `afg::rule::diagram`) first.
+- **Linking back to the PDF (`--link-pdf`, opt-in):** with `--sio`, fills the add-on's `HeaderURL_filepdf#page=` field with a `file:///…/lecture.pdf#page=8` link, so the note's header opens the page the figure came from. The run prints a warning, because the link has limits: it holds the PDF's full path on your computer (which can include your user name), so anyone you share the notes with sees it; it works only on that computer and only while the PDF stays where it is; Anki on a phone can't open it; and whether the PDF opens at the right page depends on your PDF viewer. Without the option the column isn't in the CSV, so re-importing keeps any links you added yourself.
 
 ## Results
 
@@ -100,7 +127,8 @@ The rules only catch facts written in recognizable patterns. With `--ai`, the te
 - **The evaluation set is small and generated.** It has 35 gold cards across five documents, and I wrote and hand-judged them myself. It catches regressions well, but real PDFs are messier, so expect lower precision on your own files. You can score your own documents with `--private` (see [Evaluate](#evaluate)).
 - **Plain statements need the AI stage.** Facts like "Dominant alleles hide the effect of recessive ones" have no pattern a rule can use. Telling them apart from any other sentence needs grammar analysis or a language model.
 - **Grounding catches made-up text, not every wrong fact.** A small model can combine words that really are in the file into a wrong claim, and the word-overlap check can't catch that.
-- **Scanned PDFs produce no cards.** Pages that are images with no text layer need OCR, which isn't built yet.
+- **Scanned PDFs produce no text cards.** Pages that are images with no text layer need OCR, which is only used for diagram labels so far.
+- **Diagram labels from OCR are rough.** Before figures were joined from their strips, about a third of the handout's diagram cards needed fixing or deleting; I haven't recounted since. Typical problems: OCR misreads ("Nucieus", "Digestiv enzymes"), slide titles inside the picture, and two nearby labels joined into one ("Inner and outer membranes Granum"). A picture of a table and a title slide on a plain background also come out as diagrams. White text on dark backgrounds is often missed. The answer side shows the figure itself, so a misread label shows up next to the real one, and is fixed in `Answers`; boxes over the wrong text are dragged or deleted in Anki's occlusion editor. All diagram notes have the tag `afg::rule::diagram`. There is no gold set for diagrams yet, so this is a hand count, not a measured precision.
 - **Sub-bullets aren't told apart from bullets in PDFs,** so a bold term's back is "the bullets after it, up to the next bold term or slide".
 - **Rejected on licensing:** PyMuPDF (AGPL) and LayoutLMv3 (non-commercial weights) would conflict with shipping under MIT. That is why the layout analysis is rule-based on top of pdfplumber.
 
@@ -111,6 +139,7 @@ The rules only catch facts written in recognizable patterns. With `--ai`, the te
 - Python 3.11 or newer. CI tests 3.11 and 3.14 on Linux and Windows.
 - [Anki](https://apps.ankiweb.net) to study the decks. The `--csv` export needs Anki 2.1.55+.
 - Optional, for AI cards: Claude Code, an Anthropic API key, or Ollama (see [AI cards](#ai-cards-optional)).
+- Optional, for labels inside pictures: [Tesseract](https://tesseract-ocr.github.io/tessdoc/Installation.html) 4 or newer (see [Diagram cards](#diagram-cards-optional)).
 
 ### Install
 
@@ -142,6 +171,30 @@ Then in Anki: **File → Import**, and pick the `.apkg` file.
 | `--rules a,b` | Use only these rules (see [Rules](#rules)) |
 | `--ai claude` / `claude-code` / `ollama` | Also make cards with a language model (see [AI cards](#ai-cards-optional)) |
 | `--model NAME` | Model for `--ai` (default: `claude-haiku-5-5`, or `llama3.2` for Ollama) |
+| `--diagrams` | Also make an Image Occlusion note from each labeled diagram, a box over every label (see [Diagram cards](#diagram-cards-optional)) |
+| `--type-answers` | With `--diagrams`: each card also has a box to type its label, checked against the note's `Answers` field |
+| `--sio` | With `--diagrams`: diagram notes for the Simple Image Occlusion add-on, written to `OUT-sio.csv` instead of the `.apkg` |
+| `--media-dir DIR` | With `--sio`: where to write the images (default `OUT-media`) |
+| `--link-pdf` | With `--sio`: make each note's header a link to its page in the PDF; the link holds the PDF's full local path (prints a warning) |
+
+### Diagram cards (optional)
+
+```bash
+autoflashcards lecture3.pdf --diagrams                         # one note per diagram, a card per label
+autoflashcards lecture3.pdf --diagrams --type-answers          # the same, and type each label
+autoflashcards heart.png                      # a picture file is one diagram (needs Tesseract)
+autoflashcards lecture3.pdf --diagrams --sio  # for the Simple Image Occlusion add-on: lecture3-sio.csv + lecture3-media/
+```
+
+Labels that are text in the PDF need nothing else. Labels that are part of a picture (most textbook figures) need Tesseract; without it the run says so once and skips those pictures.
+
+| System | Install Tesseract |
+|---|---|
+| Windows | `winget install UB-Mannheim.TesseractOCR` (found in `C:\Program Files\Tesseract-OCR` without changing `PATH`) |
+| macOS | `brew install tesseract` |
+| Debian/Ubuntu | `sudo apt install tesseract-ocr` |
+
+OCR makes a run slower: the 18-page handout took about a minute, against 16 seconds without `--diagrams`.
 
 ### AI cards (optional)
 
@@ -269,6 +322,7 @@ autoflashcards/
 │   ├── structure.py      # headings, bullets, headers/footers → blocks
 │   ├── rules.py          # the five card rules
 │   ├── ai.py             # optional AI stage: Claude API, Claude Code, Ollama
+│   ├── diagrams.py       # --diagrams: figures, labels (text layer or Tesseract), Anki Image Occlusion notes
 │   ├── dedupe.py         # length filters and near-duplicate removal
 │   ├── export.py         # .apkg, .csv and .json writers
 │   └── models.py         # Line → Block → Card types
@@ -295,6 +349,7 @@ autoflashcards/
 - Read PowerPoint (`.pptx`) files directly, including slide levels and speaker notes.
 - Tell sub-bullets apart from bullets in PDFs.
 - Grow the evaluation set with more real-world layouts.
+- A gold set for diagram labels, so OCR changes are measured instead of hand-counted.
 
 ## Author
 

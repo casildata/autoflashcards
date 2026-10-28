@@ -15,6 +15,8 @@ dependencies = [
     "genanki>=0.13",
     "markdown-it-py>=3",
     "pdfplumber>=0.11",
+    "pillow>=10.1",  # diagram card images (pdfplumber already needs it)
+    "pypdfium2>=5.9",  # draws diagram figures without the slide background (pdfplumber already needs it)
     "rapidfuzz>=3",
     "typer>=0.12",
 ]

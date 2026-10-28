@@ -38,7 +38,12 @@ class Card:
     source: str
     heading_path: tuple[str, ...] = ()
     page: int | None = None
-    kind: Literal["basic", "cloze"] = "basic"
+    kind: Literal["basic", "cloze", "diagram"] = "basic"
+    media: tuple[str, ...] = ()  # diagram cards: the image file
+    occlusion: str = ""  # diagram cards: the boxes, in Anki Image Occlusion markup
+    answers: str = ""  # diagram cards: the labels as cloze deletions numbered like the boxes
+    typed: bool = False  # diagram cards: a box to type the label
+    sio: str = ""  # diagram cards: image and boxes for the Simple Image Occlusion add-on
 
     @property
     def source_label(self) -> str:
