@@ -1,5 +1,6 @@
 import csv
 import io
+import itertools
 import json
 import re
 import sqlite3
@@ -187,14 +188,14 @@ def test_apkg_is_an_anki_image_occlusion_note(tmp_path):
     model = models[str(DIAGRAM_MODEL_ID)]
     assert model["name"] == "Image Occlusion (autoflashcards)"
     assert model["originalStockKind"] == 6 and model["type"] == 1  # cloze
-    assert [f["name"] for f in model["flds"]] == [*IO_FIELDS, "Answers", "Source"]
+    assert [f["name"] for f in model["flds"]] == [*IO_FIELDS, "Image Labels", "Source"]
     qfmt, afmt = model["tmpls"][0]["qfmt"], model["tmpls"][0]["afmt"]
     assert "type:" not in qfmt + afmt
     # the back shows the label of this card's box, which text to speech can read
-    assert "{{cloze-only:Answers}}" in afmt and "cloze-only" not in qfmt
-    # Anki's editor warns about clozes in Answers unless the front has it with `cloze:`;
-    # this renders only when Answers is empty, so the front shows no label
-    assert "{{^Answers}}{{cloze:Answers}}{{/Answers}}" in qfmt
+    assert "{{cloze-only:Image Labels}}" in afmt and "cloze-only" not in qfmt
+    # Anki's editor warns about clozes in Image Labels unless the front has it with `cloze:`;
+    # this renders only when Image Labels is empty, so the front shows no label
+    assert "{{^Image Labels}}{{cloze:Image Labels}}{{/Image Labels}}" in qfmt
     assert '<div class="source">{{Source}}</div>' in afmt
     ((mid, fields),) = notes
     occlusion, image, header, back_extra, comments, answers, source = fields.split("")
@@ -214,8 +215,8 @@ def test_apkg_typed_answers(tmp_path):
     model = models[str(DIAGRAM_TYPED_MODEL_ID)]
     assert model["name"] == "Image Occlusion (autoflashcards, type in the answer)"
     assert model["originalStockKind"] == 6
-    assert [f["name"] for f in model["flds"]] == [*IO_FIELDS, "Answers", "Source"]
-    assert "{{type:cloze:Answers}}" in model["tmpls"][0]["qfmt"]
+    assert [f["name"] for f in model["flds"]] == [*IO_FIELDS, "Image Labels", "Source"]
+    assert "{{type:cloze:Image Labels}}" in model["tmpls"][0]["qfmt"]
     assert "cloze-only" not in model["tmpls"][0]["afmt"]  # the typing check shows the label
     ((mid, fields),) = notes
     *_, back_extra, comments, answers, source = fields.split("")
@@ -227,11 +228,12 @@ def test_apkg_typed_answers(tmp_path):
 
 
 def test_a_box_added_in_anki_says_what_answer_to_add():
-    # A box drawn in Anki's editor gets a card but no cloze in Answers; the card's script then
-    # names the box. Anki would read two braces in a row in the script as a field.
+    # A box drawn in Anki's editor gets a card but no cloze in Image Labels; the card's script
+    # then names the box. Anki would read two braces in a row in the script as a field.
     for side in ("qfmt", "afmt"):
         template = DIAGRAM_TYPED_MODEL.templates[0][side]
-        script = template.split("{{#Answers}}<script>")[1].split("</script>{{/Answers}}")[0]
+        script = template.split("{{#Image Labels}}<script>")[1]
+        script = script.split("</script>{{/Image Labels}}")[0]
         assert "has no answer yet" in script and ".cloze[data-ordinal]" in script
         # only for Anki's warning: Browse's Preview drops the typing box, answer or not
         assert "!type.textContent.trim()" in script
@@ -240,11 +242,42 @@ def test_a_box_added_in_anki_says_what_answer_to_add():
 
 def test_a_box_deleted_in_anki_says_how_to_remove_its_card():
     # Anki keeps the card of a deleted box; it shows the figure with no boxes
-    for model in (DIAGRAM_MODEL, DIAGRAM_TYPED_MODEL):
-        qfmt = model.templates[0]["qfmt"]
-        script = qfmt.split('<div id="afg-no-box"></div>\n<script>')[1].split("</script>")[0]
+    for model, side in itertools.product((DIAGRAM_MODEL, DIAGRAM_TYPED_MODEL), ("qfmt", "afmt")):
+        template = model.templates[0][side]
+        script = template.split('<div id="afg-no-box"></div>\n<script>')[1].split("</script>")[0]
         assert "Tools > Empty Cards" in script
+        # the back marks the card's box cloze-highlight, which isn't a deleted box
+        assert ".cloze-highlight[data-ordinal]" in script
+        # with no line left, Anki adds its own notice, found by its link: one message, not two
+        assert 'a[href*="#no-cloze"]' in script and "notice.parentElement.hidden = true" in script
         assert "{{" not in script and "}}" not in script
+
+
+def test_box_numbers_follow_reading_order():
+    # "Right" sits 2 px higher than "Left" on the same line: still one row, read left first
+    label = diagrams.Label
+    labels = [
+        label("Below", (10, 60, 80, 75)),
+        label("Right", (200, 14, 260, 29)),
+        label("Left", (10, 16, 80, 31)),
+    ]
+    assert [x.text for x in diagrams._in_order(labels)] == ["Left", "Right", "Below"]
+
+
+def test_cards_can_show_box_numbers():
+    for model in (DIAGRAM_MODEL, DIAGRAM_TYPED_MODEL):
+        qfmt, afmt = model.templates[0]["qfmt"], model.templates[0]["afmt"]
+        scripts = [s.split("</script>")[0] for s in (qfmt + afmt).split("<script>")[1:]]
+        assert all("{{" not in s and "}}" not in s for s in scripts)
+        # the back has buttons for the numbers and the masks; the front keeps its masks on
+        assert 'id="afg-numbers"' in afmt and 'id="afg-numbers"' not in qfmt
+        assert 'id="afg-masks"' in afmt and "afgMasksOff" not in qfmt
+        # not Anki's own #toggle, whose state is lost when an edit re-renders the card
+        assert 'id="toggle"' not in afmt
+        # the button states live on window, which outlives a re-render
+        assert "window.afgNumbers ||" in qfmt and "window.afgMasksOff ?" in afmt
+    # a box with no answer yet gets its number and an outline, to match the message
+    assert "window.afgMissing = n;" in DIAGRAM_TYPED_MODEL.templates[0]["qfmt"]
 
 
 def test_cli_diagrams(diagram_pdf, tmp_path):
@@ -258,6 +291,15 @@ def test_cli_diagrams(diagram_pdf, tmp_path):
     text_cards = sum(1 for mid, _ in notes if mid != DIAGRAM_MODEL_ID)
     assert len(notes) - text_cards == 2 + pictures
     assert card_count == text_cards + labels
+    # the summary counts a card per box, which is what Anki makes
+    assert f"and {2 + pictures} diagrams ({labels} cards, one per box) to {out}" in result.output
+    assert "Diagram notes need Anki 23.10 or newer." in result.output
+
+
+def test_read_pdf_reports_each_page(diagram_pdf):
+    calls = []
+    diagrams.read_pdf(diagram_pdf, warn=lambda m: None, progress=lambda *c: calls.append(c))
+    assert calls == [(page, len(calls)) for page in range(1, len(calls) + 1)]
 
 
 def test_cli_type_answers(diagram_pdf, tmp_path):

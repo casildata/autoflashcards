@@ -43,6 +43,12 @@ def run(ask, blocks=BLOCKS, **kwargs):
     return cards, warnings
 
 
+def test_progress_counts_finished_requests():
+    calls = []
+    run(fake(AICards(cards=[])), progress=lambda *c: calls.append(c))
+    assert calls == [(1, 1)]  # BLOCKS fit in one request
+
+
 def test_grounded_cards_are_placed_where_their_quote_is():
     ask = fake(AICards(cards=[
         card("Osmosis", "diffusion of water across a membrane", "Osmosis is the diffusion"),

@@ -1,10 +1,12 @@
 import json
+import re
 from pathlib import Path
 
 from typer.testing import CliRunner
 
-from autoflashcards import __version__
-from autoflashcards.cli import app
+from autoflashcards import __version__, readers
+from autoflashcards.cli import _deck_summary, app
+from autoflashcards.models import Card
 
 FIXTURE = Path(__file__).parent / "fixtures" / "cells.md"
 runner = CliRunner()
@@ -50,6 +52,33 @@ def test_pdf_to_apkg(cells_pdf, tmp_path):
     result = runner.invoke(app, [str(cells_pdf), "--out", str(out)])
     assert result.exit_code == 0, result.output
     assert "Wrote 9 cards" in result.output
+
+
+def test_summary_says_what_was_made_and_what_to_do_next(cells_pdf, tmp_path):
+    out = tmp_path / "deck.apkg"
+    result = runner.invoke(app, [str(cells_pdf), "--out", str(out)])
+    assert result.exit_code == 0, result.output
+    # the deck's size, then its cards per rule, most first
+    assert re.search(rf"Wrote 9 cards to {re.escape(str(out))} \(\d+ KB\)\n  \w+ \d", result.output)
+    assert re.search(r"Done in \d+\.\d s\. Next: double-click deck\.apkg to import it into Anki "
+                     r"\(or File > Import\); once imported, the file can be deleted\.$",
+                     result.output.strip())  # fmt: skip
+    # progress bars are for terminals only: tests, pipes and CI get none
+    assert "Reading cells.pdf" not in result.output
+
+
+def test_summary_of_a_lone_diagram():
+    figure = Card("p.1 figure 1", "Nucleus\nNucleolus", "diagram", "cell.png", kind="diagram")
+    out = Path(__file__)  # any existing file, for its size
+    assert _deck_summary([figure], out).startswith(
+        f"Wrote 1 diagram (2 cards, one per box) to {out} ("
+    )
+
+
+def test_pdf_pages_report_progress(cells_pdf):
+    calls = []
+    readers.read(cells_pdf, lambda *c: calls.append(c))
+    assert calls == [(page, len(calls)) for page in range(1, len(calls) + 1)]
 
 
 def test_csv_and_json_next_to_the_deck(tmp_path):

@@ -1,13 +1,22 @@
 """Command-line entry point: `autoflashcards INPUT...`."""
 
 import sys
+import time
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TextColumn,
+    TimeRemainingColumn,
+)
 
 from autoflashcards import __version__, diagrams, readers, rules
 from autoflashcards.dedupe import dedupe
@@ -31,7 +40,37 @@ def _print_version(value: bool) -> None:
         raise typer.Exit()
 
 
-def _ai_cards(blocks: list[Block], backend: str, model: str | None) -> list[Card]:
+Step = Callable[[int, int], None]  # progress(done, total)
+
+
+@contextmanager
+def _progress() -> Iterator[Callable[[str, str], Step | None]]:
+    """Yields `step(description, unit)`, which adds a progress bar for one slow step (a PDF's
+    pages, diagram OCR, AI requests) and returns its callback. Bars go to stderr, so stdout
+    stays clean for --preview, and only to a terminal: pipes, CI and tests get none."""
+    console = Console(stderr=True)
+    if not console.is_terminal:
+        yield lambda description, unit: None
+        return
+    columns = (
+        TextColumn("{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TextColumn("{task.fields[unit]}"),
+        TimeRemainingColumn(elapsed_when_finished=True),
+    )
+    with Progress(*columns, console=console) as bars:  # warnings print above the bars
+
+        def step(description: str, unit: str) -> Step:
+            task = bars.add_task(description, total=None, unit=unit)
+            return lambda done, total: bars.update(task, completed=done, total=total)
+
+        yield step
+
+
+def _ai_cards(
+    blocks: list[Block], backend: str, model: str | None, progress: Step | None
+) -> list[Card]:
     # imported here: the AI stage needs the optional [ai] extra
     from autoflashcards import ai
 
@@ -64,6 +103,7 @@ def _ai_cards(blocks: list[Block], backend: str, model: str | None) -> list[Card
             ai.BACKENDS[backend](model),
             cache_dir=app_dir / "cache",
             warn=lambda message: typer.echo(message, err=True),
+            progress=progress,
         )
     except ai.AIUnavailable as err:
         typer.echo(f"Error: {err}", err=True)
@@ -75,6 +115,26 @@ def _dropped_summary(removed: list[tuple[Card, str]], json_path: Path | None) ->
     reasons = ", ".join(f"{n} {reason}" for reason, n in counts.most_common())
     where = f"listed in {json_path}" if json_path else "run with --json to review them"
     return f"Dropped {len(removed)} card(s): {reasons}; {where}"
+
+
+def _size(path: Path) -> str:
+    size = path.stat().st_size
+    return f"{size / 1e6:.1f} MB" if size >= 1e6 else f"{max(size / 1e3, 1):.0f} KB"
+
+
+def _deck_summary(cards: list[Card], out: Path) -> str:
+    """What the .apkg holds: cards, diagram notes and their boxes, and cards per rule."""
+    text_cards = [c for c in cards if c.kind != "diagram"]
+    figures = [c for c in cards if c.kind == "diagram"]
+    parts = [f"{len(text_cards)} cards"] if text_cards else []
+    if figures:
+        boxes = sum(len(c.back.splitlines()) for c in figures)
+        diagram_s = "diagram" if len(figures) == 1 else "diagrams"
+        parts.append(f"{len(figures)} {diagram_s} ({boxes} cards, one per box)")
+    what = " and ".join(parts)
+    rules_used = Counter(c.rule for c in text_cards).most_common()
+    by_rule = ", ".join(f"{rule} {n}" for rule, n in rules_used)  # ASCII: stdout may be cp1252
+    return f"Wrote {what} to {out} ({_size(out)})" + (f"\n  {by_rule}" if by_rule else "")
 
 
 @contextmanager
@@ -152,7 +212,7 @@ def main(
         typer.Option(
             "--type-answers",
             help="Diagram notes: each card also has a box to type the label of its box, "
-            "checked against the note's Answers field.",
+            "checked against the note's Image Labels field.",
         ),
     ] = False,
     sio: Annotated[
@@ -202,23 +262,29 @@ def main(
             typer.echo(f"Error: unknown rule(s): {', '.join(unknown)}", err=True)
             raise typer.Exit(code=2)
 
+    start = time.perf_counter()
     blocks = []
     found: list[diagrams.Diagram] = []
-    for path in inputs:
-        try:
-            if path.suffix.lower() in diagrams.IMAGE_SUFFIXES:
-                found += diagrams.read_image(path)
-                continue
-            blocks += readers.read(path)
-            if with_diagrams and path.suffix.lower() == ".pdf":
-                found += diagrams.read_pdf(path, warn=lambda m: typer.echo(m, err=True))
-        except ValueError as err:
-            typer.echo(f"Error: {err}", err=True)
-            raise typer.Exit(code=2) from err
+    with _progress() as step:
+        for path in inputs:
+            try:
+                if path.suffix.lower() in diagrams.IMAGE_SUFFIXES:
+                    found += diagrams.read_image(path)
+                    continue
+                blocks += readers.read(path, step(f"Reading {path.name}", "pages"))
+                if with_diagrams and path.suffix.lower() == ".pdf":
+                    found += diagrams.read_pdf(
+                        path,
+                        warn=lambda m: typer.echo(m, err=True),
+                        progress=step(f"Finding diagrams in {path.name}", "pages"),
+                    )
+            except ValueError as err:
+                typer.echo(f"Error: {err}", err=True)
+                raise typer.Exit(code=2) from err
 
-    cards = rules.generate(blocks, selected)
-    if ai:
-        cards += _ai_cards(blocks, ai, model)
+        cards = rules.generate(blocks, selected)
+        if ai:
+            cards += _ai_cards(blocks, ai, model, step(f"AI cards ({ai})", "requests"))
     diagram_cards, media = diagrams.cards(found, typed=type_answers)
     cards += diagram_cards
     cards, removed = dedupe(cards)  # rule cards come first, so they win over AI duplicates
@@ -226,12 +292,16 @@ def main(
         with _writing(out.with_suffix(".json")):
             write_json(blocks, cards, removed, out.with_suffix(".json"))
         typer.echo(f"Wrote {len(blocks)} blocks to {out.with_suffix('.json')}")
-    if removed:
-        typer.echo(_dropped_summary(removed, out.with_suffix(".json") if json else None))
+    dropped = _dropped_summary(removed, out.with_suffix(".json") if json else None)
     if not cards:
+        if removed:
+            typer.echo(dropped)
         typer.echo("No cards found; no deck written.", err=True)
         raise typer.Exit(code=1)
 
+    if preview or preview_file:
+        if removed:
+            typer.echo(dropped)
     if preview_file:
         with _writing(preview_file):
             preview_file.write_text(preview_text(cards), encoding="utf-8")
@@ -248,7 +318,7 @@ def main(
     if apkg_cards:
         with _writing(out):
             write_apkg(apkg_cards, deck_name, out, media)
-        typer.echo(f"Wrote {len(apkg_cards)} cards to {out}")
+        typer.secho(_deck_summary(apkg_cards, out), fg="green")
     if sio_cards:
         sio_csv = out.with_name(f"{out.stem}-sio.csv")
         media_dir = media_dir or out.with_name(f"{out.stem}-media")
@@ -281,3 +351,14 @@ def main(
         skipped = len(cards) - len(text_cards)
         note = f" ({skipped} diagram card(s) are in the .apkg only)" if skipped and not sio else ""
         typer.echo(f"Wrote {len(text_cards)} cards to {out.with_suffix('.csv')}{note}")
+    if removed:
+        typer.echo(dropped)
+    done = f"Done in {time.perf_counter() - start:.1f} s."
+    if apkg_cards:
+        done += (
+            f" Next: double-click {out.name} to import it into Anki (or File > Import);"
+            " once imported, the file can be deleted."
+        )
+        if any(c.kind == "diagram" for c in apkg_cards):
+            done += " Diagram notes need Anki 23.10 or newer."
+    typer.secho(done, bold=True)

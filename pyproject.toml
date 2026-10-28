@@ -18,6 +18,7 @@ dependencies = [
     "pillow>=10.1",  # diagram card images (pdfplumber already needs it)
     "pypdfium2>=5.9",  # draws diagram figures without the slide background (pdfplumber already needs it)
     "rapidfuzz>=3",
+    "rich>=13.8",  # progress bars (typer already needs it)
     "typer>=0.12",
 ]
 

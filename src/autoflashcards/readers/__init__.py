@@ -1,5 +1,6 @@
 """Readers turn an input file into a list of Blocks."""
 
+from collections.abc import Callable
 from pathlib import Path
 
 from autoflashcards.models import Block
@@ -13,8 +14,9 @@ READERS = {
 }
 
 
-def read(path: Path) -> list[Block]:
+def read(path: Path, progress: Callable[[int, int], None] | None = None) -> list[Block]:
+    """`progress(done, total)` is called after each page of a PDF; Markdown is read at once."""
     reader = READERS.get(path.suffix.lower())
     if reader is None:
         raise ValueError(f"unsupported file type: {path.name}")
-    return reader(path)
+    return reader(path, progress) if reader is read_pdf else reader(path)

@@ -87,49 +87,120 @@ try {
 }
 </script>
 """  # noqa: E501
-# The typing box. For a box added in Anki's editor, Answers has no cloze with its number, and
+# Writes each box's number, the N of its cloze in Image Labels, on the image, so the line to fix
+# is easy to find: every box's while the Box Numbers button is on, and always the box with no
+# label yet (`afgMissing`), which also gets an outline. The hidden cloze divs hold each
+# shape's position as a fraction of the image, and Anki's container is position: relative,
+# so percentages place the numbers. Text shapes have no box to number. Anki re-renders the
+# card when its note is edited, in the same page: the button's state is kept on `window`, so
+# the numbers stay on.
+_NUMBERS = """<script>
+window.afgMissing = null;
+window.afgDrawNumbers = () => {
+    const container = document.getElementById("image-occlusion-container");
+    container.querySelectorAll(".afg-number, .afg-outline").forEach((el) => el.remove());
+    for (const shape of document.querySelectorAll("[data-ordinal][data-left]")) {
+        const n = shape.dataset.ordinal, missing = n === window.afgMissing;
+        if (shape.dataset.shape === "text" || !(window.afgNumbers || missing)) continue;
+        const left = `${shape.dataset.left * 100}%`, top = `${shape.dataset.top * 100}%`;
+        if (missing && shape.dataset.width) {
+            const outline = document.createElement("div");
+            outline.className = "afg-outline";
+            Object.assign(outline.style, { left, top,
+                width: `${shape.dataset.width * 100}%`, height: `${shape.dataset.height * 100}%` });
+            container.appendChild(outline);
+        }
+        const badge = document.createElement("div");
+        badge.className = "afg-number";
+        badge.textContent = n;
+        Object.assign(badge.style, { left, top });
+        container.appendChild(badge);
+    }
+};
+window.afgDrawNumbers();
+</script>
+"""
+# Anki's own Toggle Masks button keeps its state inside Anki's script but redraws the masks
+# whenever the card is re-rendered, so after an edit the masks are back and the next press
+# can do nothing. This button hides the masks itself and keeps its state on `window`, like
+# Box Numbers. Shift+M, Anki's shortcut for it, still works. Back only: on the front, hidden
+# masks would give the answer away.
+_MASKS = """<div><button id="afg-masks" onclick="afgToggle('afgMasksOff')">Toggle Masks</button>
+<button id="afg-numbers" onclick="afgToggle('afgNumbers')">Box Numbers</button></div>
+<script>
+window.afgToggle = (setting) => {
+    if (setting) window[setting] = !window[setting];
+    document.getElementById("image-occlusion-canvas").style.visibility =
+        window.afgMasksOff ? "hidden" : "";
+    window.afgDrawNumbers();
+};
+if (!window.afgShortcut) {
+    window.afgShortcut = true;
+    window.addEventListener("keydown", (event) => {
+        if (event.key === "M" && document.getElementById("afg-masks")) afgToggle("afgMasksOff");
+    });
+}
+afgToggle();
+</script>
+"""
+# The typing box. For a box added in Anki's editor, Image Labels has no cloze with its number, and
 # Anki shows "run Tools > Empty Cards" there instead; the script replaces that with the box's
 # number and what to add. A template can't contain two braces in a row, so they're built in JS.
-_TYPE_ANSWER = """<div id="afg-type">{{type:cloze:Answers}}</div>
-{{#Answers}}<script>
+_TYPE_ANSWER = """<div id="afg-type">{{type:cloze:Image Labels}}</div>
+{{#Image Labels}}<script>
 (() => {
     const type = document.getElementById("afg-type");
+    // the box was deleted (the back marks it cloze-highlight), so there's nothing to type
+    if (!document.querySelector(".cloze[data-ordinal], .cloze-highlight[data-ordinal]")) {
+        type.hidden = true;  // _NO_BOX says what to do
+        return;
+    }
     // Only Anki's warning, not its typing box, means this box has no answer. Previews drop
     // the typing box altogether, and so does the back, so an empty div says nothing.
     if (type.querySelector("#typeans") || !type.textContent.trim()) return;
     const box = document.querySelector(".cloze[data-ordinal]");
-    if (!box) return;  // the box was deleted: _NO_BOX says so
+    if (!box) return;  // the back
     const n = box.dataset.ordinal;
     const open = "{" + "{", close = "}" + "}";
     type.textContent = `Box ${n} has no answer yet. To type it, add ${open}c${n}::label${close}`
-        + " to this note's Answers field.";
+        + " to this note's Image Labels field.";
+    window.afgMissing = n;
+    window.afgDrawNumbers();
 })();
-</script>{{/Answers}}
+</script>{{/Image Labels}}
 """
 
 # Anki's editor warns about cloze deletions in a field that the front doesn't show with a
-# cloze filter (`cloze-only:` on the back doesn't count). This one renders only when Answers
+# cloze filter (`cloze-only:` on the back doesn't count). This one renders only when Image Labels
 # is empty, so it never shows anything.
-_CLOZE_ANSWERS = "{{^Answers}}{{cloze:Answers}}{{/Answers}}\n"
+_CLOZE_ANSWERS = "{{^Image Labels}}{{cloze:Image Labels}}{{/Image Labels}}\n"
 
 # A box deleted in Anki's editor leaves its card behind, showing the figure with no boxes.
-# Anki's Tools > Empty Cards deletes that card, once Answers has no line for it either.
+# Anki's Tools > Empty Cards deletes that card, once Image Labels has no line for it either.
+# When there's no line, Anki adds its own "No cloze N found" notice under the card; this
+# says the same in one message instead. The notice is found by its link, which, unlike its
+# text, is the same in every language. Anki runs the scripts after the whole card is in.
+# On the back, the card's box is marked cloze-highlight instead of cloze.
 _NO_BOX = """<div id="afg-no-box"></div>
 <script>
-if (!document.querySelector(".cloze[data-ordinal]")) {
+if (!document.querySelector(".cloze[data-ordinal], .cloze-highlight[data-ordinal]")) {
+    const notice = document.querySelector('a[href*="#no-cloze"]');
+    if (notice) notice.parentElement.hidden = true;
     document.getElementById("afg-no-box").textContent = "This card's box was deleted. "
-        + "To remove the card, delete the box's line in Answers, then run Tools > Empty Cards.";
+        + "To remove the card, "
+        + (notice ? "" : "delete the box's line in Image Labels, then ")
+        + "run Tools > Empty Cards.";
 }
 </script>
 """
 
 
 def _diagram_model(model_id: int, name: str, typed: bool) -> _StockModel:
-    """Anki's Image Occlusion note type plus two fields: Answers, the labels as cloze
+    """Anki's Image Occlusion note type plus two fields: Image Labels, the labels as cloze
     deletions numbered like the boxes ({{c2::Nucleolus}}), and Source, shown under the card
     like on the text cards. The back shows the label of the box this card hides (so text to
-    speech has it to read), or with `typed`, `{{type:cloze:Answers}}` asks for it."""
-    answer = _TYPE_ANSWER if typed else '<div class="label">{{cloze-only:Answers}}</div>\n'
+    speech has it to read), or with `typed`, `{{type:cloze:Image Labels}}` asks for it."""
+    answer = _TYPE_ANSWER if typed else '<div class="label">{{cloze-only:Image Labels}}</div>\n'
     return _StockModel(
         model_id,
         name,
@@ -140,17 +211,22 @@ def _diagram_model(model_id: int, name: str, typed: bool) -> _StockModel:
             {"name": "Header", "tag": 2, "preventDeletion": True},
             {"name": "Back Extra", "tag": 3, "preventDeletion": True},
             {"name": "Comments", "tag": 4, "preventDeletion": False},
-            {"name": "Answers"},
+            {"name": "Image Labels"},
             {"name": "Source"},
         ],
         templates=[
             {
                 "name": "Image Occlusion",
-                "qfmt": _IO_TEMPLATE + _NO_BOX + (_TYPE_ANSWER if typed else _CLOZE_ANSWERS),
+                "qfmt": _IO_TEMPLATE
+                + _NUMBERS
+                + _NO_BOX
+                + (_TYPE_ANSWER if typed else _CLOZE_ANSWERS),
                 "afmt": _IO_TEMPLATE
+                + _NUMBERS
+                + _NO_BOX
                 + answer
-                + """<div><button id="toggle">Toggle Masks</button></div>
-{{#Back Extra}}<div>{{Back Extra}}</div>{{/Back Extra}}
+                + _MASKS
+                + """{{#Back Extra}}<div>{{Back Extra}}</div>{{/Back Extra}}
 <div class="source">{{Source}}</div>
 """,
             }
@@ -173,6 +249,19 @@ def _diagram_model(model_id: int, name: str, typed: bool) -> _StockModel:
 }
 
 .source { margin-top: 1.5em; font-size: 12px; color: #888; }
+
+.afg-number {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    min-width: 1.4em;
+    border-radius: 0.7em;
+    background: #212121;
+    color: white;
+    font: bold 13px/1.4em arial;
+    pointer-events: none;
+}
+
+.afg-outline { position: absolute; outline: 3px solid #d00; pointer-events: none; }
 """,
         model_type=genanki.Model.CLOZE,
         stock_kind=6,  # IMAGE_OCCLUSION in Anki's StockNotetype.Kind

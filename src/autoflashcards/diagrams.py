@@ -305,7 +305,15 @@ def ocr_labels(image: Image.Image) -> list[Label]:
 
 
 def _in_order(labels: list[Label]) -> list[Label]:
-    return sorted(labels, key=lambda label: (round(label.box[1] / 10), label.box[0]))
+    """Top to bottom, then left to right, so box numbers follow the figure as it's read. A
+    label whose middle is level with a row's first label is in that row."""
+    rows: list[list[Label]] = []
+    for label in sorted(labels, key=lambda label: label.box[1]):
+        if rows and (label.box[1] + label.box[3]) / 2 < rows[-1][0].box[3]:
+            rows[-1].append(label)
+        else:
+            rows.append([label])
+    return [label for row in rows for label in sorted(row, key=lambda label: label.box[0])]
 
 
 def _render(document: pdfium.PdfDocument, page_number: int, crop: Box, resolution: int):
@@ -356,9 +364,14 @@ def _from_picture(document: pdfium.PdfDocument, page, figure: Box) -> Diagram:
     return Diagram(image, _in_order(labels), "", page.page_number)
 
 
-def read_pdf(path: Path, warn: Callable[[str], None]) -> list[Diagram]:
+def read_pdf(
+    path: Path,
+    warn: Callable[[str], None],
+    progress: Callable[[int, int], None] | None = None,
+) -> list[Diagram]:
     """Labeled figures in a PDF. Pictures with no text on them are read with Tesseract when
-    it is installed; `warn` is called once if it isn't."""
+    it is installed; `warn` is called once if it isn't. `progress(done, total)` is called
+    after each page."""
     diagrams = []
     ocr, warned = _tesseract() is not None, False
     try:
@@ -391,6 +404,8 @@ def read_pdf(path: Path, warn: Callable[[str], None]) -> list[Diagram]:
                     number += 1
                     diagram.source, diagram.number = path.name, number
                     diagrams.append(diagram)
+            if progress:
+                progress(page.page_number, len(pdf.pages))
     return diagrams
 
 
@@ -460,7 +475,7 @@ def _sio_front(diagram: Diagram, image: str) -> str:
 
 def _answers(diagram: Diagram) -> str:
     """The labels as cloze deletions numbered like their boxes: the card for box 2 shows the
-    text of {{c2::...}} on its back, or asks for it with `{{type:cloze:Answers}}`. One per
+    text of {{c2::...}} on its back, or asks for it with `{{type:cloze:Image Labels}}`. One per
     line, so a misread label is easy to find and fix in Anki's editor."""
     return "<br>".join(
         f"{{{{c{i + 1}::{html.escape(label.text)}}}}}" for i, label in enumerate(diagram.labels)

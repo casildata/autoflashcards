@@ -1,5 +1,6 @@
 """PDF reader: pdfplumber lines with font size and weight, then the structure stage."""
 
+from collections.abc import Callable
 from pathlib import Path
 from statistics import median
 
@@ -127,7 +128,8 @@ def _bold_lead(chars: list[dict]) -> str:
     return _text(visible[start:end])
 
 
-def read_lines(path: Path) -> list[Line]:
+def read_lines(path: Path, progress: Callable[[int, int], None] | None = None) -> list[Line]:
+    """`progress(done, total)` is called after each page."""
     lines = []
     try:
         with pdfplumber.open(path) as pdf:
@@ -159,10 +161,12 @@ def read_lines(path: Path) -> list[Line]:
                                 box_right=box_right,
                             )
                         )
+                if progress:
+                    progress(page.page_number, len(pdf.pages))
     except Exception as err:  # pdfminer raises many types for damaged or encrypted files
         raise ValueError(f"can't read {path.name}: {err}") from err
     return lines
 
 
-def read_pdf(path: Path) -> list[Block]:
-    return to_blocks(read_lines(path), path.name)
+def read_pdf(path: Path, progress: Callable[[int, int], None] | None = None) -> list[Block]:
+    return to_blocks(read_lines(path, progress), path.name)

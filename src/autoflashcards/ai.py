@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -301,12 +302,26 @@ def generate(
     ask: Ask,
     cache_dir: Path | None = None,
     warn: Callable[[str], None] = print,
+    progress: Callable[[int, int], None] | None = None,
 ) -> list[Card]:
     """AI cards for all blocks. Failed chunks are skipped with a warning; AIUnavailable
-    propagates."""
+    propagates. `progress(done, total)` is called as each request finishes."""
     rule = f"ai_{backend}"
+    todo = list(chunks(blocks))
+    done = 0
+    lock = threading.Lock()
 
     def one(chunk: list[Block]) -> list[Card]:
+        nonlocal done
+        try:
+            return ask_one(chunk)
+        finally:
+            with lock:
+                done += 1
+                if progress:
+                    progress(done, len(todo))
+
+    def ask_one(chunk: list[Block]) -> list[Card]:
         text = render(chunk)
         cached = cache_dir / f"{_cache_key(backend, model, text)}.json" if cache_dir else None
         if cached and cached.exists():
@@ -326,7 +341,7 @@ def generate(
         return [card for card in cards if card]
 
     with ThreadPoolExecutor(MAX_WORKERS) as pool:
-        return [card for made in pool.map(one, chunks(blocks)) for card in made]
+        return [card for made in pool.map(one, todo) for card in made]
 
 
 def _ask_twice(ask: Ask, text: str, chunk: list[Block], warn) -> AICards | None:
