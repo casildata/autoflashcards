@@ -116,9 +116,17 @@ def test_json_matches_the_schema(tmp_path):
         Block("bullet", "Osmosis: movement of water", "cells.md", bold_lead="Osmosis"),
     ]
     diagram = Card(
-        "Cell", "", "diagram", "cells.pdf", page=2, kind="diagram", media=("cell.png",),
+        "Cell",
+        "",
+        "diagram",
+        "cells.pdf",
+        page=2,
+        kind="diagram",
+        media=("cell.png",),
         occlusion="{{c1::image-occlusion:rect:left=.1:top=.2:width=.3:height=.1}}",
-        answers="{{c1::Nucleus}}", typed=True, sio="cell.png",
+        answers="{{c1::Nucleus}}",
+        typed=True,
+        sio="cell.png",
     )
     write_json(blocks, [*CARDS, diagram], [(CARDS[1], "too long")], out)
     # every Block and Card field is required and no others are allowed: a new field fails here
