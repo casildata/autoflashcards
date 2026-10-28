@@ -156,6 +156,8 @@ autoflashcards lecture3.pdf                                        # writes lect
 autoflashcards week1.md week2.pdf --deck "Bio 101" --out bio.apkg
 ```
 
+To try it without your own files, [`examples/`](examples/) has Markdown notes, ten pages of NASA's public-domain *Rockets Educator Guide* and a labeled figure from it (`python eval/fetch.py examples` downloads the NASA pages).
+
 In a terminal, the slow steps show progress bars: reading each PDF's pages, finding diagrams (where OCR runs) and AI requests. The run ends with a summary, which on the biology handout with `--diagrams` reads:
 
 ```
@@ -235,6 +237,8 @@ python eval/score.py --private    # scores eval/private/<name>.pdf against <name
 python eval/score.py --ai claude  # rules + AI cards; writes outputs/eval-claude.md
 python -m pytest -q               # unit tests
 ```
+
+A held-out set of real documents is being set up in [`eval/holdout/`](eval/holdout/): a NIST slide deck (also as a 4-slides-per-page handout), a chapter of NIST SP 800-12, a two-column CC BY research article and a public-domain labeled cell diagram, across cybersecurity, medical education and biology. Its gold cards are written before the tool is run on it, and nothing is tuned on it. It hasn't been scored yet.
 
 To score your own PDFs, put them in `eval/private/` (ignored by git) with a `<name>.jsonl` beside each, one `{"term": "...", "fact": "..."}` per line. CI runs the rules evaluation on every push and shows the table in the run summary. The rules + Claude evaluation runs only when started by hand, because it calls the API.
 
@@ -338,7 +342,10 @@ autoflashcards/
 ├── eval/
 │   ├── make_docs.py      # generates the five test PDFs
 │   ├── score.py          # scores cards against the gold set
-│   └── gold/             # hand-written gold cards and hand judgments
+│   ├── gold/             # hand-written gold cards and hand judgments
+│   ├── fetch.py          # downloads the example and held-out documents, checks SHA-256
+│   └── holdout/          # held-out real documents: sources, licenses, gold cards
+├── examples/             # sample inputs: Markdown notes, NASA guide pages, a labeled figure
 ├── tests/                # pytest suite; make_fixtures.py builds test PDFs
 ├── outputs/              # generated evaluation reports and decks (git-ignored)
 ├── .github/workflows/    # CI: lint, tests, eval, license gate, pip-audit, gitleaks

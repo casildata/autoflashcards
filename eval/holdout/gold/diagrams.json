@@ -1,0 +1,14 @@
+{
+  "animal-cell.png": [
+    "Nucleus", "Nuclear pore", "Chromatin", "Nuclear envelope", "Nucleus", "Nucleolus",
+    "Peroxisome", "Microtubule", "Lysosome", "Free Ribosomes", "Mitochondrion",
+    "Intermediate Filaments", "Plasma membrane", "Golgi vesicles (golgi apparatus)",
+    "Ribosomes", "Rough endoplasmic reticulum", "Smooth endoplasmic reticulum",
+    "Actin Filaments", "Cytoplasm", "Secretory vesicle", "Centrosome (with 2 centrioles)",
+    "Flagellum"
+  ],
+  "csf-slides.pdf p.10": [
+    "Govern", "Identify", "Protect", "Detect", "Respond", "Recover",
+    "NIST Cybersecurity Framework"
+  ]
+}

@@ -1,0 +1,33 @@
+{"term": "Information system", "fact": "a discrete set of information resources organized for the collection, processing, maintenance, use, sharing, dissemination, or disposition of information"}
+{"term": "Information", "fact": "facts or ideas, which can be represented (encoded) as various forms of data; knowledge in any medium or form that can be communicated between system entities"}
+{"term": "Information security", "fact": "the protection of information and information systems from unauthorized access, use, disclosure, disruption, modification, or destruction in order to ensure confidentiality, integrity, and availability"}
+{"term": "Confidentiality", "fact": "preserving authorized restrictions on information access and disclosure, including means for protecting personal privacy and proprietary information"}
+{"term": "Integrity", "fact": "guarding against improper information modification or destruction and ensuring information non-repudiation and authenticity"}
+{"term": "Data integrity", "fact": "the property that data has not been altered in an unauthorized manner, in storage, during processing, and while in transit"}
+{"term": "System integrity", "fact": "the quality that a system has when it performs its intended function in an unimpaired manner, free from unauthorized manipulation of the system"}
+{"term": "Availability", "fact": "ensuring timely and reliable access to and use of information"}
+{"term": "Security controls", "fact": "the management, operational, and technical controls (safeguards or countermeasures) prescribed for a system to protect the confidentiality, availability, and integrity of the system and its information"}
+{"term": "Computer Security Act of 1987", "fact": "required agencies to identify sensitive systems, conduct computer security training, and develop computer security plans; superseded by FISMA"}
+{"term": "E-Government Act of 2002", "fact": "established a Federal Chief Information Officer within the Office of Management and Budget to enhance the management and promotion of electronic government services"}
+{"term": "Risk Executive Function", "fact": "an individual or group within an organization responsible for ensuring that risk is viewed from an organization-wide perspective and managed consistently across the organization"}
+{"term": "Chief Executive Officer", "fact": "the highest-level senior official or executive in an organization with the overall responsibility to provide information security protections commensurate with the risk"}
+{"term": "Chief Information Officer", "fact": "an organizational official responsible for designating a senior agency information security officer and developing and maintaining security policies, procedures, and control techniques"}
+{"term": "Information Owner/Steward", "fact": "an organizational official with authority for specified information who establishes the policies and procedures governing its generation, collection, processing, dissemination, and disposal"}
+{"term": "Senior Agency Information Security Officer", "fact": "an organizational official who carries out the CIO security responsibilities under FISMA and is the primary liaison between the CIO and authorizing officials; also known as the Chief Information Security Officer (CISO)"}
+{"term": "Authorizing Official", "fact": "a senior official or executive with the authority to formally assume responsibility for operating a system at an acceptable level of risk"}
+{"term": "Authorizing Official Designated Representative", "fact": "an organizational official who acts on behalf of an authorizing official in the day-to-day security authorization activities, but cannot accept risk for the system"}
+{"term": "Senior Agency Official for Privacy", "fact": "a senior organizational official with overall responsibility and accountability for the agency's implementation of information privacy protections"}
+{"term": "Common Control Provider", "fact": "an individual, group, or organization responsible for the development, implementation, assessment, and monitoring of common controls (security controls inherited by systems)"}
+{"term": "System Owner", "fact": "an organizational official responsible for the procurement, development, integration, modification, operation, maintenance, and disposal of a system"}
+{"term": "System Security Officer", "fact": "responsible for ensuring that an appropriate operational security posture is maintained for a system; works in close collaboration with the system owner"}
+{"term": "Information Security Architect", "fact": "responsible for ensuring that the information security requirements are adequately addressed in all aspects of enterprise architecture"}
+{"term": "System Security Engineer", "fact": "an individual, group, or organization responsible for conducting system security engineering activities"}
+{"term": "Security Control Assessor", "fact": "responsible for conducting a comprehensive assessment of the security controls employed within or inherited by a system to determine their overall effectiveness"}
+{"term": "System Administrator", "fact": "an individual, group, or organization responsible for setting up and maintaining a system or specific components of a system"}
+{"term": "User", "fact": "an individual, group, or organization granted access to organizational information in order to perform assigned duties"}
+{"term": "Auditor", "fact": "examines systems to determine whether the system is meeting stated security requirements and organization policies, and whether security controls are appropriate"}
+{"term": "Physical Security Staff", "fact": "responsible for developing and enforcing appropriate physical security controls; in government, often processes personnel background checks and security clearances"}
+{"term": "Procurement Office Staff", "fact": "responsible for ensuring that organizational procurements have been reviewed by appropriate officials"}
+{"term": "Human Resources", "fact": "often the first point-of-contact for managers determining whether a security background investigation is necessary for a position; may handle security-related exit procedures"}
+{"term": "Physical Plant Staff", "fact": "responsible for ensuring the provision of the services necessary for the safe and secure operation of an organization's systems, such as electrical power and environmental controls"}
+{"term": "Privacy Office Staff", "fact": "responsible for maintaining a comprehensive privacy program that ensures compliance with privacy requirements, develops and evaluates privacy policy, and manages privacy risks"}

@@ -24,3 +24,6 @@ desktop.ini
 
 # Plan Notes
 docs/PLAN.md
+# Downloaded by eval/fetch.py (third-party documents are not kept in git)
+examples/files/
+eval/holdout/docs/

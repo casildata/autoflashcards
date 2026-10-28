@@ -1,0 +1,8 @@
+{"term": "Anki", "fact": "flashcard software built upon a spaced repetition algorithm"}
+{"term": "Anki review intervals", "fact": "after one day, three days, seven days, 14 days, and 28 days"}
+{"term": "Difficult Anki cards", "fact": "reappear after a short interval, whereas quickly recalled cards reappear after a longer interval"}
+{"term": "Control group", "fact": "traditional study methods consisting of books and lectures"}
+{"term": "Intervention group", "fact": "an Anki flashcard deck of the same topics to learn via spaced repetition"}
+{"term": "IMNCI", "fact": "Integrated Management of Neonatal and Childhood Illnesses"}
+{"term": "Independent sample t test", "fact": "used to determine the difference between the two groups (intervention versus control)"}
+{"term": "Paired t test", "fact": "used to measure the differences between the pretest and posttest results of each group"}
