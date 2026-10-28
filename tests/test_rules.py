@@ -93,6 +93,34 @@ def test_bold_term_with_dash():
 
 
 @pytest.mark.parametrize(
+    ("text", "back"),
+    [
+        (
+            "Osmosis is the movement of water across a membrane.",
+            "the movement of water across a membrane.",
+        ),
+        ("Osmosis refers to the movement of water.", "the movement of water."),
+        ("Osmosis is defined as the movement of water.", "the movement of water."),
+        ("Osmosis means water moving across a membrane.", "water moving across a membrane."),
+    ],
+)
+def test_bold_term_drops_the_linking_verb(text, back):
+    assert _lead(text, "Osmosis") == ("Osmosis", back)
+
+
+def test_bold_term_keeps_a_short_definition_after_the_linking_verb():
+    # the length check counts "is", so dropping it doesn't drop the card
+    assert _lead("Osmosis is passive diffusion.", "Osmosis") == ("Osmosis", "passive diffusion.")
+
+
+def test_bold_term_keeps_a_verb_that_carries_meaning():
+    assert _lead("Islets produce insulin and glucagon.", "Islets") == (
+        "Islets",
+        "produce insulin and glucagon.",
+    )
+
+
+@pytest.mark.parametrize(
     ("text", "lead"),
     [
         ("Osmosis: movement of water.", "Osmosis"),  # term_colon's job

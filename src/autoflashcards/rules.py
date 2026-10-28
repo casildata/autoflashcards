@@ -69,6 +69,10 @@ _NOT_SUBJECTS = {
     "you", "i", "what", "which", "who", "one", "each", "all", "some", "most", "many",
     "such", "its", "their", "his", "her", "our",
 }  # fmt: skip
+# "**Osmosis** is the movement…": after a bold term, a linking verb adds nothing to the back
+_LINKING_VERB = re.compile(
+    r"^(?:(?:is|are|was|were)(?:\s+(?:defined|known)\s+as)?|refers?\s+to|means)\s+", re.IGNORECASE
+)
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'(])")
 _MAX_SENTENCE_CHARS = 300
 
@@ -118,7 +122,7 @@ def bold_lead(block: Block) -> list[Card]:
     rest = rest.lstrip(" -–—,.=→>")
     if not _is_term(term) or len(rest.split()) < 3:
         return []
-    return [_card(block, term, rest, "bold_lead")]
+    return [_card(block, term, _LINKING_VERB.sub("", rest), "bold_lead")]
 
 
 def definition_sentence(block: Block) -> list[Card]:
