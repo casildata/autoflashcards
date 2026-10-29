@@ -2,6 +2,7 @@
 
     python eval/score.py              # the generated documents in eval/gold
     python eval/score.py --private    # your own PDFs: eval/private/<name>.pdf + <name>.jsonl
+    python eval/score.py --holdout    # the held-out real documents (eval/holdout/README.md)
     python eval/score.py --ai claude  # rules plus AI cards (calls the model; replies cached)
 
 A gold line is {"term": ..., "fact": ...}: something a student should get a card for. A card
@@ -78,6 +79,7 @@ class Score:
     sound: list[Card] = field(default_factory=list)  # match no gold card, judged correct
     wrong: list[tuple[Card, str]] = field(default_factory=list)  # judged wrong, and why
     missed: list[dict] = field(default_factory=list)
+    dropped: list[tuple[Card, str]] = field(default_factory=list)  # removed by dedupe, and why
     ai_cards: int = 0
     ai_hits: int = 0
     injected: int = 0  # cards repeating the hostile document's hidden instruction
@@ -144,6 +146,7 @@ def report(scores: list[Score], title: str) -> str:
         total.extra += s.extra
         total.sound += s.sound
         total.wrong += s.wrong
+        total.dropped += s.dropped
         total.ai_cards += s.ai_cards
         total.ai_hits += s.ai_hits
         total.injected += s.injected
@@ -151,13 +154,14 @@ def report(scores: list[Score], title: str) -> str:
         f"# {title}",
         "",
         "| Document | Cards | Gold | Matched | Precision | Recall | Duplicates | Unjudged "
-        "| Injected |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Injected | Dropped |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for s in [*scores, total]:
         lines.append(
             f"| {s.name} | {s.cards} | {s.gold} | {s.found} | {s.precision:.0%} "
-            f"| {s.recall:.0%} | {len(s.duplicates)} | {len(s.extra)} | {s.injected} |"
+            f"| {s.recall:.0%} | {len(s.duplicates)} | {len(s.extra)} | {s.injected} "
+            f"| {len(s.dropped)} |"
         )
     if total.ai_cards:
         rule_cards, rule_hits = total.cards - total.ai_cards, total.hits - total.ai_hits
@@ -174,6 +178,9 @@ def report(scores: list[Score], title: str) -> str:
         "",
         f"*Injected* counts cards that repeat the hidden instruction in the hostile "
         f"document (a link to {CANARY}); it should be 0.",
+        "",
+        "*Dropped* counts cards the filter removed (duplicates, too long, empty); they aren't in "
+        "the deck or the other columns.",
     ]
     for s in scores:
         lines += ["", f"## {s.name}"]
@@ -187,7 +194,9 @@ def report(scores: list[Score], title: str) -> str:
             lines += ["", "Duplicates:", *(f"- {_card_text(c)}" for c in s.duplicates)]
         if s.extra:
             lines += ["", "Unjudged:", *(f"- {_card_text(c)}" for c in s.extra)]
-        if not (s.missed or s.extra or s.duplicates or s.wrong or s.sound):
+        if s.dropped:
+            lines += ["", "Dropped:", *(f"- {_card_text(c)} ({why})" for c, why in s.dropped)]
+        if not (s.missed or s.extra or s.duplicates or s.wrong or s.sound or s.dropped):
             lines += ["", "All gold cards found, nothing extra."]
     return "\n".join(lines) + "\n"
 
@@ -203,38 +212,53 @@ def run(
     out_dir: Path,
     backend: str | None = None,
     model: str | None = None,
+    gold_for: dict[str, str] | None = None,
 ) -> list[Score]:
     """Score each document against gold_dir/<name>.jsonl and write its deck to out_dir.
+    gold_for maps a document to another one's gold file (same content, another layout).
     With a backend, AI cards are added after the rule cards, as the CLI does."""
     if backend:
         from autoflashcards import ai
 
         model = model or ai.MODELS[backend]
         ask = ai.BACKENDS[backend](model)
+    out_dir.mkdir(parents=True, exist_ok=True)
     scores = []
     for name, path in documents.items():
-        gold = _jsonl(gold_dir / f"{name}.jsonl")
-        judged_path = gold_dir / f"{name}.judged.jsonl"
+        gold_name = (gold_for or {}).get(name, name)
+        gold = _jsonl(gold_dir / f"{gold_name}.jsonl")
+        judged_path = gold_dir / f"{gold_name}.judged.jsonl"
         judged = _jsonl(judged_path) if judged_path.exists() else []
         blocks = readers.read(path)
         cards = rules.generate(blocks)
         if backend:
             cards += ai.generate(blocks, backend, model, ask, cache_dir=ROOT / ".cache" / "ai")
-        cards, _ = dedupe(cards)
+        cards, dropped = dedupe(cards)
         if cards:
             write_apkg(cards, name, out_dir / f"{name}.apkg")
         scores.append(score(name, cards, gold, judged))
+        scores[-1].dropped = dropped
     return scores
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--private", action="store_true", help="score eval/private/ instead")
+    parser.add_argument(
+        "--holdout", action="store_true", help="score eval/holdout/ (run eval/fetch.py holdout)"
+    )
     parser.add_argument("--ai", choices=["claude", "claude-code", "ollama"], help="add AI cards")
     parser.add_argument("--model", help="model for --ai (default: the CLI's)")
     args = parser.parse_args()
 
-    if args.private:
+    gold_for = None
+    if args.holdout:
+        gold_dir, out_dir = ROOT / "eval" / "holdout" / "gold", ROOT / "outputs" / "holdout"
+        # PDFs only: animal-cell.png is a diagram, scored by its labels, not by these gold cards
+        documents = {p.stem: p for p in sorted((ROOT / "eval" / "holdout" / "docs").glob("*.pdf"))}
+        gold_for = {"csf-handout": "csf-slides"}  # the same slides, 4 per page
+        title, report_path = "Evaluation (held-out documents)", ROOT / "outputs" / "eval-holdout.md"
+    elif args.private:
         gold_dir = out_dir = ROOT / "eval" / "private"
         documents = {p.stem: p for p in sorted(gold_dir.glob("*.pdf"))}
         title, report_path = "Evaluation (private documents)", gold_dir / "eval.md"
@@ -252,7 +276,7 @@ def main() -> int:
     if args.ai:
         title += f" (rules + {args.ai})"
         report_path = report_path.with_name(f"{report_path.stem}-{args.ai}.md")
-    scores = run(documents, gold_dir, out_dir, args.ai, args.model)
+    scores = run(documents, gold_dir, out_dir, args.ai, args.model, gold_for)
     text = report(scores, title)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(text, encoding="utf-8")

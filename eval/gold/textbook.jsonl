@@ -7,3 +7,5 @@
 {"term": "Punnett square", "fact": "a grid used to predict the genotypes of offspring from two parents"}
 {"term": "Homozygous", "fact": "having two identical alleles of a gene"}
 {"term": "Heterozygous", "fact": "having two different alleles of a gene"}
+{"term": "Locus", "fact": "the fixed position of a gene on a chromosome"}
+{"term": "Mutation", "fact": "a permanent change in the DNA sequence of a gene"}
