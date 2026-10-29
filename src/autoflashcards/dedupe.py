@@ -11,6 +11,10 @@ MAX_BACK_CHARS = 600
 MAX_CLOZE_CHARS = 600
 NEAR_DUPLICATE = 90  # rapidfuzz ratio (0-100) of front + back at or above which cards match
 LINKING_WORD = re.compile(r"(is|are|means|refers to)\b")  # a back cut just after the term
+# "covered in section 4.3": points to the definition instead of giving it
+CROSS_REFERENCE = re.compile(
+    r"(see|covered|discussed|described|explained)\b|.*\b(section|chapter)\s+\d"
+)
 
 
 def _problem(card: Card) -> str | None:
@@ -34,6 +38,8 @@ def _score(card: Card) -> int:
     score = 0
     if LINKING_WORD.match(back):
         score -= 2
+    if CROSS_REFERENCE.match(back):
+        score -= 2
     if 4 <= len(words) <= 30:  # shorter is a label, longer ran into the next sentence
         score += 2
     if card.back.rstrip().endswith((".", "!", "?")):
@@ -44,12 +50,13 @@ def _score(card: Card) -> int:
 
 
 def _better(card: Card, old: Card) -> bool:
-    """Whether `card` should replace the earlier duplicate `old`; on a tie the first one stays."""
+    """Whether `card` should replace the earlier duplicate `old`: a higher score, or the same
+    score and a longer back; on a full tie the first one stays."""
     if not card.kind == old.kind == "basic":
         return False
     if card.rule.startswith("ai_") and not old.rule.startswith("ai_"):
         return False  # rule cards come first and win over AI duplicates
-    return _score(card) > _score(old)
+    return (_score(card), len(card.back.split())) > (_score(old), len(old.back.split()))
 
 
 def dedupe(cards: list[Card]) -> tuple[list[Card], list[tuple[Card, str]]]:

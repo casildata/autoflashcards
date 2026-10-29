@@ -57,6 +57,30 @@ def test_a_run_on_back_loses_to_a_clean_one():
     assert [c.back for c in kept] == [clean]
 
 
+def test_a_cross_reference_loses_to_the_definition():
+    kept, _ = dedupe([
+        card("Mutation", "covered in section 4.3."),
+        card("Mutation", "a permanent change in the DNA sequence of a gene."),
+    ])  # fmt: skip
+    assert [c.back for c in kept] == ["a permanent change in the DNA sequence of a gene."]
+
+
+def test_see_inside_a_definition_is_not_a_cross_reference():
+    kept, _ = dedupe([
+        card("Rods", "cells in the retina."),
+        card("Rods", "cells that let us see in dim light."),
+    ])  # fmt: skip
+    assert [c.back for c in kept] == ["cells that let us see in dim light."]
+
+
+def test_on_a_tie_the_longer_back_wins():
+    kept, _ = dedupe([
+        card("Locus", "position of a gene."),
+        card("Locus", "the fixed position of a gene on a chromosome."),
+    ])  # fmt: skip
+    assert [c.back for c in kept] == ["the fixed position of a gene on a chromosome."]
+
+
 def test_the_better_card_takes_the_first_ones_place():
     kept, _ = reasons([
         card("Osmosis", "movement of water"),
