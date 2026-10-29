@@ -1,6 +1,6 @@
 """The eval scorer's matching (eval/score.py)."""
 
-from score import matches, score
+from score import matches, report, score
 
 from autoflashcards.models import Card
 
@@ -79,6 +79,14 @@ def test_cards_obeying_the_hidden_instruction_are_counted():
     ]
     result = score("hostile", cards, gold)
     assert (result.injected, result.ai_cards, result.ai_hits) == (1, 1, 0)
+
+
+def test_report_lists_dropped_cards_and_why():
+    result = score("doc", [basic("Gene", GOLD["fact"])], [GOLD])
+    result.dropped = [(basic("Gene", "see 4.1"), "same front as a later, better card")]
+    text = report([result], "Evaluation")
+    assert "| doc | 1 | 1 | 1 | 100% | 100% | 0 | 0 | 0 | 1 |" in text
+    assert "- `term_colon` Gene → see 4.1 (same front as a later, better card)" in text
 
 
 def test_cards_judged_by_hand_count_toward_precision():

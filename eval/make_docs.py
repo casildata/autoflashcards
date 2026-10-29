@@ -226,6 +226,10 @@ TEXTBOOK = [
         ("para", "A gene is a stretch of DNA that carries the instructions for one protein. "
          "Genes sit at fixed places on chromosomes, and each body cell has two copies of "
          "most of them, one from each parent."),
+        # a short gloss and a forward reference, each defined properly on page 3: the deck
+        # should keep the full definitions
+        ("para", "Locus: position of a gene."),
+        ("para", "Mutation: covered in section 4.3."),
         ("lead", "Allele|a version of a gene. One gene can have many alleles in a "
          "population, though each person carries at most two."),
         ("para", "Genotype: the set of alleles an organism carries."),
@@ -241,6 +245,13 @@ TEXTBOOK = [
          "from two parents."),
         ("para", "Homozygous means having two identical alleles of a gene, and heterozygous "
          "means having two different ones."),
+    ],
+    [
+        ("h2", "4.3 Chromosomes and Mutations"),
+        ("lead", "Locus|is the fixed position of a gene on a chromosome, the same in every "
+         "member of a species."),
+        ("lead", "Mutation|is a permanent change in the DNA sequence of a gene. Mutations "
+         "are the source of new alleles."),
     ],
 ]  # fmt: skip
 
